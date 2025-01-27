@@ -7,13 +7,13 @@
 void command(int cmd) {
   switch (cmd) {
     case 1:
-      Serial.println("Comando 1 recebido!");
+      Serial.println("Program1");
       break;
     case 2:
-      Serial.println("Comando 2 recebido!");
+      Serial.println("Program2");
       break;
     default:
-      Serial.println("Comando desconhecido.");
+      Serial.println("Program3");
   }
 }
 
