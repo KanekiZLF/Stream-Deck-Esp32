@@ -1,5 +1,6 @@
 #include <TFT_eSPI.h>  // Biblioteca TFT_eSPI
 #include <SPI.h>
+#include "commands.h" // Inclui o arquivo de comandos
 
 // Cria um objeto do display
 TFT_eSPI tft = TFT_eSPI(); 
@@ -13,7 +14,6 @@ const int numBits = 8;    /* Número de bits (botões) */
 // Estado dos botões
 bool buttonPressed[numBits] = {false}; // Controla se o botão foi "clicado"
 bool lastButtonState[numBits] = {false}; // Estado anterior dos botões
-String cmd; // Variável para armazenar comandos
 
 void setup() {
   Serial.begin(115200);  // Inicializa o monitor serial
@@ -54,53 +54,49 @@ void loop() {
       buttonPressed[i] = true;
       Serial.print("Botão pressionado: ");
       Serial.println(i + 1);
-    
-      // Abre um determinado programa
-      if (i == 1) {
-        cmd = "Navegador";
-        Serial.println(cmd);
-      }
 
       // Define a função do botão/ação
       int btN = 0;
-      switch(i) {
+      switch (i) {
         case 4:
           btN = 1;
-        break;
+          command(1); // Chama o comando 1
+          break;
 
         case 5:
           btN = 2;
-        break;
+          command(2); // Chama o comando 2
+          break;
 
         case 6:
           btN = 3;
-        break;
+          break;
 
         case 7:
           btN = 4;
-        break;
+          break;
 
         case 3:
           btN = 5;
-        break;
+          break;
 
         case 2:
           btN = 6;
-        break;
+          break;
 
         case 1:
           btN = 7;
-        break;
+          break;
 
         case 0:
           btN = 8;
-        break;
-        
+          break;
       }
+
       // Atualizar o display com o botão pressionado
       tft.fillScreen(TFT_BLACK);
-      tft.fillRect(10, 20, 100, 30, TFT_BLACK); // Limpar área anterior
-      tft.drawString("Botao: " + String(btN), 10, 20);
+      String message = "Botao: " + String(btN);
+      tft.drawString(message, 10, 20); // Exibe a mensagem
     }
 
     // Verifica se o botão foi solto
