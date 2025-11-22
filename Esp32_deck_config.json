@@ -1,0 +1,80 @@
+{
+    "version": "1.0.0",
+    "buttons": {
+        "1": {
+            "label": "Botão 1",
+            "icon": "icons\\btn1_chrome.png",
+            "action": {
+                "type": "open_program",
+                "payload": "C:/Program Files/Google/Chrome/Application/chrome.exe"
+            }
+        },
+        "2": {
+            "label": "Botão 2",
+            "icon": "icons\\btn2_vmde.png",
+            "action": {
+                "type": "open_program",
+                "payload": "C:/Program Files (x86)/Vector Magic/vmde.exe"
+            }
+        },
+        "3": {
+            "label": "Botão 3",
+            "icon": "icons\\btn3_RiotClientServices.png",
+            "action": {
+                "type": "open_program",
+                "payload": "C:/Riot Games/Riot Client/RiotClientServices.exe"
+            }
+        },
+        "4": {
+            "label": "Botão 4",
+            "icon": "",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "5": {
+            "label": "Botão 5",
+            "icon": "",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "6": {
+            "label": "Botão 6",
+            "icon": "",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "7": {
+            "label": "Botão 7",
+            "icon": "",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "8": {
+            "label": "Botão 8",
+            "icon": "",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        }
+    },
+    "serial": {
+        "port": "COM1",
+        "baud": 115200
+    },
+    "appearance": {
+        "theme": "Dark",
+        "icon_size": 64
+    },
+    "update": {
+        "check_url": "https://raw.githubusercontent.com/yourrepo/streamdeck/main/version.json"
+    }
+}
