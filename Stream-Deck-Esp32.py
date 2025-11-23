@@ -1,6 +1,8 @@
 from __future__ import annotations
 import os
 import sys
+import atexit
+import signal
 import json
 import threading
 import time
@@ -354,43 +356,97 @@ class SerialManager:
         self._serial: Optional[serial.Serial] = None
         self._thread: Optional[threading.Thread] = None
         self._running = False
+        self._is_connected = False
+    # ✅ ADICIONE ESTES MÉTODOS FALTANTES:
+    def is_port_available(self, port: str) -> bool:
+        """Verifica se a porta serial está disponível"""
+        try:
+            test_serial = serial.Serial(
+                port=port,
+                baudrate=self.config.data.get('serial', {}).get('baud', DEFAULT_SERIAL_BAUD),
+                timeout=0.1
+            )
+            test_serial.close()
+            return True
+        except serial.SerialException as e:
+            if "Acesso negado" in str(e) or "PermissionError" in str(e):
+                self.logger.error(f"❌ Porta {port} está em uso por outro programa!")
+                return False
+            else:
+                self.logger.warn(f"Porta {port} não disponível: {e}")
+                return False
+        except Exception as e:
+            self.logger.error(f"Erro verificando porta {port}: {e}")
+            return False
 
     def list_ports(self) -> List[str]:
+        """Lista portas seriais disponíveis"""
         return [p.device for p in serial.tools.list_ports.comports()]
+
+
+    def send_disconnect_command(self):
+        """Envia comando de desconexão para ESP32"""
+        try:
+            if self._serial and self._serial.is_open:
+                self._serial.write(b"DISCONNECT\n")
+                self.logger.info("📤 Comando de desconexão enviado para ESP32")
+                time.sleep(0.3)  # Espera o comando ser enviado
+                return True
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao enviar comando de desconexão: {e}")
+        return False
+
+    def disconnect(self):
+        """Desconecta gracefulmente - AVISA o ESP32 antes"""
+        try:
+            # ✅ PRIMEIRO: Avisa o ESP32 que vai desconectar
+            if self._is_connected:
+                self.send_disconnect_command()
+            
+            # Depois fecha a conexão
+            self._running = False
+            self._is_connected = False
+            
+            if self._serial and self._serial.is_open:
+                self._serial.close()
+                self.logger.info('🔌 Porta serial fechada')
+                
+        except Exception as e:
+            self.logger.warn(f'⚠️ Erro ao fechar serial: {e}')
 
     def connect(self, port: str, baud: int = DEFAULT_SERIAL_BAUD):
         try:
+            if not self.is_port_available(port):
+                return False
+                
             if self._serial and self._serial.is_open:
                 self.disconnect()
-            self._serial = serial.Serial(port, baud, timeout=1)
-            time.sleep(1)
+            
+            self._serial = serial.Serial(
+                port=port,
+                baudrate=baud,
+                timeout=1,
+                write_timeout=1,
+                dsrdtr=False,
+                rtscts=False,
+                xonxoff=False
+            )
+            
+            time.sleep(2)
+            
             self._running = True
+            self._is_connected = True
             self._thread = threading.Thread(target=self._reader_loop, daemon=True)
             self._thread.start()
-            self.logger.info(f'Conectado a {port} @ {baud}')
+            
+            # Envia comando de conexão estabelecida
+            self._serial.write(b"CONNECTED\n")
+            
+            self.logger.info(f'✅ Conectado a {port} @ {baud}')
             return True
+            
         except Exception as e:
-            self.logger.error(f'Falha ao conectar serial: {e}')
-            return False
-
-    def disconnect(self):
-        self._running = False
-        try:
-            if self._serial and self._serial.is_open:
-                self._serial.close()
-                self.logger.info('Porta serial fechada')
-        except Exception as e:
-            self.logger.warn(f'Erro ao fechar serial: {e}')
-
-    def send(self, text: str):
-        try:
-            if not self._serial or not self._serial.is_open:
-                self.logger.warn('Serial não conectada')
-                return False
-            self._serial.write(text.encode('utf-8') + b'\n')
-            return True
-        except Exception as e:
-            self.logger.error(f'Erro ao enviar serial: {e}')
+            self.logger.error(f'❌ Falha ao conectar serial: {e}')
             return False
 
     def _reader_loop(self):
@@ -400,18 +456,18 @@ class SerialManager:
                     if self._serial.in_waiting > 0:
                         line = self._serial.readline().decode('utf-8', errors='ignore').strip()
                         if line:
-                            self.logger.debug(f'Recebido serial: {line}')
+                            self.logger.debug(f'📨 Recebido serial: {line}')
                             if self.on_message:
                                 self.on_message(line)
                     else:
                         time.sleep(0.05)
                 except Exception as e:
-                    self.logger.error(f'Erro leitura serial: {e}')
+                    self.logger.error(f'❌ Erro leitura serial: {e}')
                     break
         finally:
             self._running = False
-            self.logger.debug('Thread serial encerrada')
-
+            self._is_connected = False
+            self.logger.debug('📴 Thread serial encerrada')
 # -----------------------------
 # Update Checker
 # -----------------------------
@@ -864,7 +920,6 @@ class Esp32DeckApp(ctk.CTk):
         self.action_manager = ActionManager(self.logger)
         self.serial_manager = SerialManager(self.config, self.logger, on_message=self._on_serial_message)
         self.update_checker = UpdateChecker(self.config, self.logger)
-
         self.colors = {
             "primary": "#2B5B84",
             "secondary": "#3D8BC2", 
@@ -906,6 +961,36 @@ class Esp32DeckApp(ctk.CTk):
             self.attributes('-alpha', transparency)
         except Exception:
             pass
+
+        atexit.register(self._cleanup_on_exit)
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+
+    def _cleanup_on_exit(self):
+        """Limpeza quando o programa fechar - AVISA O ESP32"""
+        try:
+            self.logger.info("🚪 Fechando aplicação...")
+            if hasattr(self, 'serial_manager'):
+                # ✅ IMPORTANTE: Avisa o ESP32 que está desconectando
+                self.serial_manager.disconnect()
+            if hasattr(self, 'config'):
+                self.config.save()
+            self.logger.info("👋 Aplicação fechada gracefulmente")
+        except Exception as e:
+            print(f"Erro na limpeza: {e}")
+
+    def _signal_handler(self, signum, frame):
+        """Handler para sinais do sistema (Ctrl+C, etc)"""
+        self._cleanup_on_exit()
+        sys.exit(0)
+
+    def on_closing(self):
+        """Quando usuário fecha a janela pelo X"""
+        try:
+            self._cleanup_on_exit()
+        except Exception as e:
+            print(f"Erro ao fechar: {e}")
+        self.destroy() 
     
     def _recursive_update_widgets(self, widget):
         """

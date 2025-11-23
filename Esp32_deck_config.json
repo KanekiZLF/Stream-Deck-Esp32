@@ -11,25 +11,25 @@
         },
         "2": {
             "label": "Botão 2",
-            "icon": "icons\\btn2_vmde.png",
+            "icon": "",
             "action": {
                 "type": "open_program",
-                "payload": "C:/Program Files (x86)/Vector Magic/vmde.exe"
+                "payload": ""
             }
         },
         "3": {
             "label": "Botão 3",
-            "icon": "icons\\btn3_RiotClientServices.png",
+            "icon": "",
             "action": {
                 "type": "open_program",
-                "payload": "C:/Riot Games/Riot Client/RiotClientServices.exe"
+                "payload": ""
             }
         },
         "4": {
             "label": "Botão 4",
             "icon": "",
             "action": {
-                "type": "none",
+                "type": "open_program",
                 "payload": ""
             }
         },
@@ -37,7 +37,7 @@
             "label": "Botão 5",
             "icon": "",
             "action": {
-                "type": "none",
+                "type": "open_program",
                 "payload": ""
             }
         },
@@ -45,7 +45,7 @@
             "label": "Botão 6",
             "icon": "",
             "action": {
-                "type": "none",
+                "type": "open_program",
                 "payload": ""
             }
         },
@@ -53,7 +53,7 @@
             "label": "Botão 7",
             "icon": "",
             "action": {
-                "type": "none",
+                "type": "open_program",
                 "payload": ""
             }
         },
@@ -61,7 +61,7 @@
             "label": "Botão 8",
             "icon": "",
             "action": {
-                "type": "none",
+                "type": "open_program",
                 "payload": ""
             }
         }
