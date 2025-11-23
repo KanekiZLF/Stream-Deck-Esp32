@@ -874,6 +874,9 @@ class Esp32DeckApp(ctk.CTk):
         # Build UI
         self._build_ui()
 
+        # ✅ CARREGAR CONFIGURAÇÕES DE APARÊNCIA
+        self._load_appearance_settings()
+
         # Hook logger to textbox after it's created
         self.logger.textbox = self.log_textbox
 
@@ -883,6 +886,32 @@ class Esp32DeckApp(ctk.CTk):
         # Refresh display
         self.refresh_all_buttons()
         self.update_serial_ports()
+        # Aplicar transparência salva
+        try:
+            transparency = self.config.data.get('appearance', {}).get('transparency', 1.0)
+            self.attributes('-alpha', transparency)
+        except Exception:
+            pass
+
+    def _load_appearance_settings(self):
+        """Carrega as configurações de aparência salvas"""
+        try:
+            appearance = self.config.data.get('appearance', {})
+            
+            # Aplicar tema
+            theme = appearance.get('theme', 'System')
+            ctk.set_appearance_mode(theme)
+            
+            # Aplicar transparência
+            transparency = appearance.get('transparency', 1.0)
+            self.attributes('-alpha', transparency)
+            
+            # Aplicar esquema de cores
+            color_scheme = appearance.get('color_scheme', 'Padrão')
+            self._on_color_scheme_change(color_scheme)
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao carregar configurações de aparência: {e}")
 
     def _setup_theme(self):
         """Configure custom theme colors"""
@@ -899,6 +928,169 @@ class Esp32DeckApp(ctk.CTk):
         # Define a posição
         self.geometry(f'+{x}+{y}')
 
+    def _apply_custom_theme(self, theme_config):
+        """Aplica um tema customizado ao CustomTkinter"""
+        try:
+            # Obter o gerenciador de tema
+            from customtkinter import ThemeManager
+            
+            # Aplicar configurações do tema
+            for widget_type, styles in theme_config.items():
+                for style_name, style_value in styles.items():
+                    ThemeManager.theme[widget_type][style_name] = style_value
+            
+            # Forçar atualização de todos os widgets
+            self._update_all_widgets(self)
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao aplicar tema customizado: {e}")
+
+    def _update_all_widgets(self, widget):
+        """Atualiza recursivamente todos os widgets"""
+        try:
+            widget.configure()
+            for child in widget.winfo_children():
+                self._update_all_widgets(child)
+        except:
+            pass
+
+    def _on_transparency_change(self, value):
+        """Altera a transparência da janela"""
+        try:
+            self.attributes('-alpha', value)
+            self.transparency_label.configure(text=f"{int(value * 100)}%")
+            
+            if 'appearance' not in self.config.data:
+                self.config.data['appearance'] = {}
+            self.config.data['appearance']['transparency'] = value
+            self.config.save()
+        except Exception as e:
+            self.logger.error(f"Erro ao alterar transparência: {e}")
+
+    def _on_color_scheme_change(self, value):
+        """Altera o esquema de cores"""
+        try:
+            # ✅ IMPLEMENTAÇÃO REAL - Criar temas customizados
+            if value == 'Padrão':
+                ctk.set_default_color_theme("dark-blue")
+            elif value == 'Moderno':
+                # Tema azul moderno
+                self._apply_custom_theme({
+                    "CTk": {"fg_color": ["#2B2B2B", "#1E1E1E"]},
+                    "CTkButton": {"fg_color": ["#3B8ED0", "#1F6AA5"], "hover_color": ["#36719F", "#144870"]},
+                    "CTkFrame": {"fg_color": ["#2B2B2B", "#1E1E1E"]}
+                })
+            elif value == 'Vibrante':
+                # Tema verde vibrante
+                self._apply_custom_theme({
+                    "CTk": {"fg_color": ["#2B2B2B", "#1E1E1E"]},
+                    "CTkButton": {"fg_color": ["#28A745", "#1E7E34"], "hover_color": ["#218838", "#155724"]},
+                    "CTkFrame": {"fg_color": ["#2B2B2B", "#1E1E1E"]}
+                })
+            elif value == 'Suave':
+                # Tema roxo suave
+                self._apply_custom_theme({
+                    "CTk": {"fg_color": ["#2B2B2B", "#1E1E1E"]},
+                    "CTkButton": {"fg_color": ["#6F42C1", "#5A2D91"], "hover_color": ["#5A2D91", "#4A2378"]},
+                    "CTkFrame": {"fg_color": ["#2B2B2B", "#1E1E1E"]}
+                })
+            elif value == 'Escuro Total':
+                # Tema completamente escuro
+                self._apply_custom_theme({
+                    "CTk": {"fg_color": ["#1A1A1A", "#0D0D0D"]},
+                    "CTkButton": {"fg_color": ["#333333", "#222222"], "hover_color": ["#444444", "#2A2A2A"]},
+                    "CTkFrame": {"fg_color": ["#1A1A1A", "#0D0D0D"]}
+                })
+            
+            # ✅ FORÇAR ATUALIZAÇÃO
+            self.update()
+            
+            if 'appearance' not in self.config.data:
+                self.config.data['appearance'] = {}
+            self.config.data['appearance']['color_scheme'] = value
+            self.config.save()
+            
+            self.logger.info(f"Esquema de cores alterado para: {value}")
+        except Exception as e:
+            self.logger.error(f"Erro ao alterar esquema de cores: {e}")
+
+    def _on_font_size_change(self, value):
+        """Altera o tamanho da fonte global"""
+        try:
+            size_map = {
+                'Pequeno': 12,
+                'Médio': 14, 
+                'Grande': 16
+            }
+            
+            new_size = size_map.get(value, 14)
+            
+            # ✅ APLICAR EM ALGUNS ELEMENTOS CHAVE (simplificado)
+            try:
+                # Atualizar fonte do header
+                for widget in self.winfo_children():
+                    if hasattr(widget, 'winfo_children'):
+                        for child in widget.winfo_children():
+                            if isinstance(child, ctk.CTkLabel):
+                                current_font = child.cget("font")
+                                if isinstance(current_font, ctk.CTkFont):
+                                    new_font = ctk.CTkFont(
+                                        family=current_font._family,
+                                        size=new_size,
+                                        weight=current_font._weight
+                                    )
+                                    child.configure(font=new_font)
+            except Exception as font_error:
+                self.logger.debug(f"Ajuste de fonte parcial: {font_error}")
+            
+            if 'appearance' not in self.config.data:
+                self.config.data['appearance'] = {}
+            self.config.data['appearance']['font_size'] = value
+            self.config.save()
+            
+            self.logger.info(f"Tamanho da fonte alterado para: {value}")
+            messagebox.showinfo("Configuração Aplicada", 
+                            f"Tamanho da fonte alterado para '{value}'. Alguns elementos podem requerer reinício para aplicação completa.")
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao alterar tamanho da fonte: {e}")
+
+    def _reset_appearance(self):
+        """Restaura todas as configurações de aparência para os padrões"""
+        try:
+            if messagebox.askyesno("Confirmar Reset", 
+                                "Deseja restaurar todas as configurações de aparência para os valores padrão?"):
+                
+                # Resetar configurações
+                self.config.data['appearance'] = {
+                    'theme': 'System',
+                    'transparency': 1.0,
+                    'color_scheme': 'Padrão',
+                    'font_size': 'Médio'
+                }
+                
+                # ✅ APLICAR RESET COMPLETO
+                ctk.set_appearance_mode('System')
+                ctk.set_default_color_theme("dark-blue")
+                self.attributes('-alpha', 1.0)
+                
+                # ✅ FORÇAR ATUALIZAÇÃO
+                self.update()
+                
+                # Atualizar UI
+                self.theme_menu.set('System')
+                self.transparency_var.set(1.0)
+                self.transparency_label.configure(text="100%")
+                self.color_scheme_menu.set('Padrão')
+                self.font_size_menu.set('Médio')
+                
+                self.config.save()
+                self.logger.info("Configurações de aparência restauradas para padrão")
+                messagebox.showinfo("Reset Concluído", "Configurações de aparência restauradas com sucesso!")
+                
+        except Exception as e:
+            self.logger.error(f"Erro ao resetar aparência: {e}")
+            
     # -----------------------------
     # UI Construction
     # -----------------------------
@@ -1090,43 +1282,99 @@ class Esp32DeckApp(ctk.CTk):
         main_frame = ctk.CTkFrame(parent, corner_radius=10)
         main_frame.pack(fill='both', expand=True, padx=10, pady=10)
         
-        # Appearance settings
+        # 🎨 APARÊNCIA AVANÇADA
         appearance_frame = ctk.CTkFrame(main_frame, corner_radius=8)
         appearance_frame.pack(fill='x', padx=15, pady=15)
         
-        ctk.CTkLabel(appearance_frame, text="🎨 Aparência", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor='w', pady=(10, 15))
+        ctk.CTkLabel(appearance_frame, text="🎨 Personalização da Interface", 
+                    font=ctk.CTkFont(size=16, weight="bold")).pack(anchor='w', pady=(10, 15))
         
-        # Tema
+        # ✅ TEMA
         theme_frame = ctk.CTkFrame(appearance_frame, fg_color="transparent")
         theme_frame.pack(fill='x', padx=10, pady=8)
-        ctk.CTkLabel(theme_frame, text="Tema:").pack(side='left')
-        theme_menu = ctk.CTkOptionMenu(theme_frame, values=['System', 'Light', 'Dark'], 
-                                     command=self._on_theme_change, width=150)
-        theme_menu.pack(side='left', padx=10)
-        theme_menu.set(self.config.data.get('appearance', {}).get('theme', 'System'))
+        ctk.CTkLabel(theme_frame, text="Tema de Cores:", font=ctk.CTkFont(weight="bold")).pack(side='left')
+        theme_values = ['System', 'Claro', 'Escuro']
+        self.theme_menu = ctk.CTkOptionMenu(theme_frame, values=theme_values, 
+                                        command=self._on_theme_change, width=150)
+        self.theme_menu.pack(side='left', padx=10)
+
+        # Configurar tema atual
+        current_theme = self.config.data.get('appearance', {}).get('theme', 'System')
+        theme_display = {'System': 'System', 'Light': 'Claro', 'Dark': 'Escuro'}
+        self.theme_menu.set(theme_display.get(current_theme, 'System'))
         
-        # Tamanho do ícone
-        icon_frame = ctk.CTkFrame(appearance_frame, fg_color="transparent")
-        icon_frame.pack(fill='x', padx=10, pady=8)
-        ctk.CTkLabel(icon_frame, text="Tamanho de Ícone:").pack(side='left')
-        icon_menu = ctk.CTkOptionMenu(icon_frame, values=['32','48','64','96','128'], 
-                                    command=self._on_icon_size_change, width=150)
-        icon_menu.pack(side='left', padx=10)
-        icon_menu.set(str(self.config.data.get('appearance', {}).get('icon_size', ICON_SIZE[0])))
+        # Configurar tema atual
+        current_theme = self.config.data.get('appearance', {}).get('theme', 'System')
+        theme_display = {'System': 'System', 'Light': 'Claro', 'Dark': 'Escuro'}
+        self.theme_menu.set(theme_display.get(current_theme, 'System'))
         
-        # Backup/Restore
-        backup_frame = ctk.CTkFrame(main_frame, corner_radius=8)
-        backup_frame.pack(fill='x', padx=15, pady=15)
+        # ✅ TRANSPARÊNCIA DA JANELA
+        transparency_frame = ctk.CTkFrame(appearance_frame, fg_color="transparent")
+        transparency_frame.pack(fill='x', padx=10, pady=8)
+        ctk.CTkLabel(transparency_frame, text="Transparência:", font=ctk.CTkFont(weight="bold")).pack(side='left')
         
-        ctk.CTkLabel(backup_frame, text="💾 Backup e Restauração", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor='w', pady=(10, 15))
+        self.transparency_var = tk.DoubleVar(value=self.config.data.get('appearance', {}).get('transparency', 1.0))
+        transparency_slider = ctk.CTkSlider(
+            transparency_frame, 
+            from_=0.5, 
+            to=1.0, 
+            number_of_steps=10,
+            variable=self.transparency_var,
+            command=self._on_transparency_change,
+            width=150
+        )
+        transparency_slider.pack(side='left', padx=10)
         
-        btn_frame = ctk.CTkFrame(backup_frame, fg_color="transparent")
-        btn_frame.pack(fill='x', padx=10, pady=10)
+        self.transparency_label = ctk.CTkLabel(transparency_frame, text=f"{int(self.transparency_var.get() * 100)}%")
+        self.transparency_label.pack(side='left', padx=5)
         
-        ctk.CTkButton(btn_frame, text="📤 Fazer Backup", command=self._backup_config,
-                     fg_color=COLORS["warning"]).pack(side='left', padx=5)
-        ctk.CTkButton(btn_frame, text="📥 Restaurar Config", command=self._restore_config,
-                     fg_color=COLORS["primary"]).pack(side='left', padx=5)
+        # ✅ CORES DOS BOTÕES
+        colors_frame = ctk.CTkFrame(appearance_frame, fg_color="transparent")
+        colors_frame.pack(fill='x', padx=10, pady=8)
+        ctk.CTkLabel(colors_frame, text="Esquema de Cores:", font=ctk.CTkFont(weight="bold")).pack(side='left')
+        
+        color_schemes = ['Padrão', 'Moderno', 'Vibrante', 'Suave', 'Escuro Total']
+        self.color_scheme_menu = ctk.CTkOptionMenu(
+            colors_frame, 
+            values=color_schemes, 
+            command=self._on_color_scheme_change, 
+            width=150
+        )
+        self.color_scheme_menu.pack(side='left', padx=10)
+        self.color_scheme_menu.set(self.config.data.get('appearance', {}).get('color_scheme', 'Padrão'))
+        
+        # ✅ TAMANHO DA FONTE
+        font_frame = ctk.CTkFrame(appearance_frame, fg_color="transparent")
+        font_frame.pack(fill='x', padx=10, pady=8)
+        ctk.CTkLabel(font_frame, text="Tamanho da Fonte:", font=ctk.CTkFont(weight="bold")).pack(side='left')
+        
+        font_sizes = ['Pequeno', 'Médio', 'Grande']
+        self.font_size_menu = ctk.CTkOptionMenu(
+            font_frame, 
+            values=font_sizes, 
+            command=self._on_font_size_change, 
+            width=150
+        )
+        self.font_size_menu.pack(side='left', padx=10)
+        self.font_size_menu.set(self.config.data.get('appearance', {}).get('font_size', 'Médio'))
+        
+        # ✅ BOTÃO DE RESET
+        reset_frame = ctk.CTkFrame(appearance_frame, fg_color="transparent")
+        reset_frame.pack(fill='x', padx=10, pady=15)
+        ctk.CTkButton(
+            reset_frame, 
+            text="🔄 Restaurar Padrões", 
+            command=self._reset_appearance,
+            fg_color=COLORS["warning"],
+            hover_color="#E0A800",
+            width=180
+        ).pack(side='left')
+        
+        # ✅ PREVIEW AO VIVO
+        preview_frame = ctk.CTkFrame(appearance_frame, corner_radius=6)
+        preview_frame.pack(fill='x', padx=10, pady=10)
+        ctk.CTkLabel(preview_frame, text="👀 Preview - As alterações são aplicadas instantaneamente", 
+                    font=ctk.CTkFont(size=12, weight="bold")).pack(pady=8)
 
     def _build_update_tab(self, parent):
         main_frame = ctk.CTkFrame(parent, corner_radius=10)
@@ -1233,13 +1481,31 @@ class Esp32DeckApp(ctk.CTk):
             pass
 
     def _on_theme_change(self, value):
-        ctk.set_appearance_mode(value)
-        if 'appearance' not in self.config.data:
-            self.config.data['appearance'] = {}
-        self.config.data['appearance']['theme'] = value
-        self.config.save()
+        """Altera o tema da aplicação"""
+        try:
+            # Mapear valores em português para inglês
+            theme_map = {
+                'System': 'System',
+                'Claro': 'Light', 
+                'Escuro': 'Dark',
+                'Azul': 'Dark',
+                'Verde': 'Dark',
+                'Roxo': 'Dark'
+            }
+            
+            english_theme = theme_map.get(value, 'System')
+            ctk.set_appearance_mode(english_theme)
+            
+            if 'appearance' not in self.config.data:
+                self.config.data['appearance'] = {}
+            self.config.data['appearance']['theme'] = english_theme
+            self.config.save()
+            
+            self.logger.info(f"Tema alterado para: {value}")
+        except Exception as e:
+            self.logger.error(f"Erro ao alterar tema: {e}")
 
-    def _on_icon_size_change(self, value):
+    '''def _on_icon_size_change(self, value):
         try:
             v = int(value)
             if 'appearance' not in self.config.data:
@@ -1249,7 +1515,7 @@ class Esp32DeckApp(ctk.CTk):
             self.config.save()
             self.refresh_all_buttons()
         except Exception:
-            pass
+            pass'''
             
     def _on_baud_change(self, value):
         try:
