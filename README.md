@@ -248,5 +248,5 @@ Distribuído sob licença MIT. Veja `LICENSE` para mais informações.
 ### ⭐ Se este projeto te ajudou, deixe uma estrela no repositório!
 
 **Feito com muito ☕ por Luiz F. R. Pimentel**
-
+[⬆ Voltar ao topo](#-esp32-deck-controller)
 </div>
