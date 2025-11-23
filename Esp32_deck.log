@@ -1,0 +1,280 @@
+
+--- Starting session Sun Nov 23 13:57:55 2025 ---
+[2025-11-23 13:58:04] [INFO] Configurações salvas com sucesso
+[2025-11-23 13:58:08] [INFO] Configurações salvas com sucesso
+[2025-11-23 13:58:10] [INFO] Configurações salvas com sucesso
+[2025-11-23 13:58:12] [INFO] Interface atualizada
+[2025-11-23 13:58:12] [INFO] Interface atualizada
+
+--- Starting session Sun Nov 23 13:59:32 2025 ---
+[2025-11-23 13:59:33] [INFO] Tema aplicado: Suave
+[2025-11-23 13:59:37] [INFO] Tema aplicado: Vibrante
+[2025-11-23 13:59:38] [INFO] Configurações salvas com sucesso
+
+--- Starting session Sun Nov 23 14:01:59 2025 ---
+[2025-11-23 14:02:00] [INFO] Tema aplicado: Vibrante
+[2025-11-23 14:02:06] [INFO] Tema aplicado: Escuro Total
+[2025-11-23 14:02:08] [INFO] Configurações salvas com sucesso
+
+--- Starting session Sun Nov 23 14:04:21 2025 ---
+[2025-11-23 14:04:22] [INFO] Esquema de cores alterado para: Escuro Total
+[2025-11-23 14:04:36] [INFO] Esquema de cores alterado para: Moderno
+[2025-11-23 14:04:37] [INFO] Configurações salvas com sucesso
+[2025-11-23 14:04:44] [INFO] Tamanho da fonte alterado para: Médio
+
+--- Starting session Sun Nov 23 14:04:49 2025 ---
+[2025-11-23 14:04:51] [INFO] Esquema de cores alterado para: Moderno
+[2025-11-23 14:05:01] [INFO] Tema alterado para: Claro
+[2025-11-23 14:05:05] [INFO] Esquema de cores alterado para: Moderno
+[2025-11-23 14:05:08] [INFO] Tema alterado para: Escuro
+
+--- Starting session Sun Nov 23 14:10:03 2025 ---
+[2025-11-23 14:10:04] [INFO] Tema aplicado: Moderno
+[2025-11-23 14:10:09] [INFO] Tema alterado para: Escuro
+[2025-11-23 14:10:11] [INFO] Tema alterado para: Claro
+[2025-11-23 14:10:12] [INFO] Tema alterado para: System
+[2025-11-23 14:10:13] [INFO] Tema alterado para: Escuro
+[2025-11-23 14:10:19] [INFO] Tema aplicado: Moderno
+[2025-11-23 14:10:21] [INFO] Tema aplicado: Suave
+[2025-11-23 14:10:22] [INFO] Configurações salvas com sucesso
+
+--- Starting session Sun Nov 23 14:14:18 2025 ---
+[2025-11-23 14:14:19] [INFO] Esquema de cores aplicado: Suave
+[2025-11-23 14:14:25] [INFO] Esquema de cores aplicado: Escuro Total
+[2025-11-23 14:14:26] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:14:27] [INFO] Configurações salvas com sucesso
+[2025-11-23 14:14:32] [INFO] Fonte alterada para: Grande (18px)
+[2025-11-23 14:14:32] [INFO] Configurações salvas com sucesso
+
+--- Starting session Sun Nov 23 14:15:19 2025 ---
+[2025-11-23 14:15:20] [INFO] Esquema de cores aplicado: Moderno
+
+--- Starting session Sun Nov 23 14:15:39 2025 ---
+[2025-11-23 14:15:40] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:15:44] [WARN] Arquivo de tema não encontrado: themes/suavi.json. Usando padrão.
+[2025-11-23 14:15:44] [INFO] Esquema de cores aplicado: Suave
+[2025-11-23 14:15:52] [INFO] Configurações salvas com sucesso
+[2025-11-23 14:15:56] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:15:57] [INFO] Configurações salvas com sucesso
+[2025-11-23 14:16:02] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:16:04] [INFO] Configurações salvas com sucesso
+[2025-11-23 14:16:06] [INFO] Esquema de cores aplicado: Vibrante
+[2025-11-23 14:16:08] [WARN] Arquivo de tema não encontrado: themes/suavi.json. Usando padrão.
+[2025-11-23 14:16:08] [INFO] Esquema de cores aplicado: Suave
+[2025-11-23 14:16:19] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:16:20] [INFO] Configurações salvas com sucesso
+
+--- Starting session Sun Nov 23 14:16:35 2025 ---
+[2025-11-23 14:16:37] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:16:41] [WARN] Arquivo de tema não encontrado: themes/moderni.json. Usando padrão.
+[2025-11-23 14:16:41] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:16:43] [WARN] Arquivo de tema não encontrado: themes/vibranti.json. Usando padrão.
+[2025-11-23 14:16:43] [INFO] Esquema de cores aplicado: Vibrante
+[2025-11-23 14:16:44] [WARN] Arquivo de tema não encontrado: themes/suavi.json. Usando padrão.
+[2025-11-23 14:16:44] [INFO] Esquema de cores aplicado: Suave
+[2025-11-23 14:16:46] [WARN] Arquivo de tema não encontrado: themes/escuro_ttal.json. Usando padrão.
+[2025-11-23 14:16:46] [INFO] Esquema de cores aplicado: Escuro Total
+[2025-11-23 14:16:49] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:16:56] [INFO] Fonte alterada para: Pequeno (12px)
+[2025-11-23 14:16:57] [INFO] Fonte alterada para: Médio (14px)
+[2025-11-23 14:16:59] [INFO] Fonte alterada para: Grande (18px)
+[2025-11-23 14:17:01] [INFO] Fonte alterada para: Pequeno (12px)
+[2025-11-23 14:17:03] [INFO] Fonte alterada para: Médio (14px)
+[2025-11-23 14:17:04] [INFO] Configurações salvas com sucesso
+[2025-11-23 14:17:08] [INFO] Fonte alterada para: Grande (18px)
+[2025-11-23 14:17:09] [INFO] Fonte alterada para: Médio (14px)
+[2025-11-23 14:17:11] [INFO] Fonte alterada para: Pequeno (12px)
+[2025-11-23 14:17:12] [INFO] Fonte alterada para: Médio (14px)
+[2025-11-23 14:17:13] [INFO] Configurações salvas com sucesso
+[2025-11-23 14:17:15] [INFO] Configurações de aparência restauradas para padrão
+[2025-11-23 14:17:18] [INFO] Tema alterado para: Escuro
+[2025-11-23 14:17:21] [WARN] Arquivo de tema não encontrado: themes/escuro_ttal.json. Usando padrão.
+[2025-11-23 14:17:21] [INFO] Esquema de cores aplicado: Escuro Total
+[2025-11-23 14:17:23] [INFO] Esquema de cores aplicado: Padrão
+
+--- Starting session Sun Nov 23 14:17:27 2025 ---
+[2025-11-23 14:17:28] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:17:33] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:17:35] [INFO] Esquema de cores aplicado: Suave
+[2025-11-23 14:17:36] [INFO] Esquema de cores aplicado: Suave
+[2025-11-23 14:17:37] [INFO] Esquema de cores aplicado: Escuro Total
+[2025-11-23 14:17:39] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:17:41] [INFO] Configurações salvas com sucesso
+
+--- Starting session Sun Nov 23 14:21:21 2025 ---
+[2025-11-23 14:21:22] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:21:30] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:21:35] [INFO] Esquema de cores aplicado: Suave
+[2025-11-23 14:21:37] [INFO] Esquema de cores aplicado: Escuro Total
+[2025-11-23 14:21:40] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:21:43] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:21:44] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:21:51] [INFO] Configurações salvas com sucesso
+[2025-11-23 14:21:53] [INFO] Configurações salvas com sucesso
+[2025-11-23 14:22:15] [INFO] Esquema de cores aplicado: Vibrante
+[2025-11-23 14:22:25] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:22:26] [INFO] Configurações salvas com sucesso
+
+--- Starting session Sun Nov 23 14:24:51 2025 ---
+[2025-11-23 14:24:53] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:24:58] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:25:02] [INFO] Configurações salvas com sucesso
+
+--- Starting session Sun Nov 23 14:26:11 2025 ---
+[2025-11-23 14:26:13] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:26:18] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:26:18] [INFO] Configurações salvas com sucesso
+[2025-11-23 14:26:24] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:26:25] [INFO] Configurações salvas com sucesso
+
+--- Starting session Sun Nov 23 14:27:20 2025 ---
+[2025-11-23 14:27:21] [INFO] Esquema de cores aplicado: Moderno
+
+--- Starting session Sun Nov 23 14:28:47 2025 ---
+[2025-11-23 14:28:49] [INFO] Esquema de cores aplicado: Moderno
+
+--- Starting session Sun Nov 23 14:29:30 2025 ---
+[2025-11-23 14:29:31] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:29:37] [INFO] Esquema de cores aplicado: Vibrante
+[2025-11-23 14:29:40] [INFO] Esquema de cores aplicado: Suave
+[2025-11-23 14:29:42] [INFO] Esquema de cores aplicado: Escuro Total
+[2025-11-23 14:29:49] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:29:50] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:29:51] [INFO] Configurações salvas com sucesso
+
+--- Starting session Sun Nov 23 14:38:26 2025 ---
+[2025-11-23 14:38:27] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:38:35] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:38:39] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:38:40] [INFO] Esquema de cores aplicado: Vibrante
+[2025-11-23 14:38:43] [INFO] Esquema de cores aplicado: Suave
+[2025-11-23 14:38:45] [INFO] Esquema de cores aplicado: Escuro Total
+[2025-11-23 14:38:50] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:38:50] [INFO] Configurações salvas com sucesso
+
+--- Starting session Sun Nov 23 14:40:59 2025 ---
+[2025-11-23 14:41:00] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:41:07] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:41:14] [INFO] Esquema de cores aplicado: Moderno
+
+--- Starting session Sun Nov 23 14:41:58 2025 ---
+[2025-11-23 14:42:00] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:42:20] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:42:23] [INFO] Esquema de cores aplicado: Escuro Total
+[2025-11-23 14:42:24] [INFO] Esquema de cores aplicado: Vibrante
+[2025-11-23 14:42:27] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:42:32] [INFO] Esquema de cores aplicado: Suave
+[2025-11-23 14:42:34] [INFO] Esquema de cores aplicado: Padrão
+
+--- Starting session Sun Nov 23 14:43:53 2025 ---
+[2025-11-23 14:43:55] [INFO] Esquema de cores aplicado: Padrão
+
+--- Starting session Sun Nov 23 14:44:31 2025 ---
+[2025-11-23 14:44:32] [INFO] Esquema de cores aplicado: Padrão
+
+--- Starting session Sun Nov 23 14:44:45 2025 ---
+[2025-11-23 14:44:46] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:44:50] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:44:51] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:45:00] [INFO] Esquema de cores aplicado: Padrão
+
+--- Starting session Sun Nov 23 14:45:10 2025 ---
+[2025-11-23 14:45:11] [INFO] Esquema de cores aplicado: Padrão
+
+--- Starting session Sun Nov 23 14:46:09 2025 ---
+[2025-11-23 14:46:11] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:46:18] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:46:20] [INFO] Esquema de cores aplicado: Vibrante
+[2025-11-23 14:46:22] [INFO] Esquema de cores aplicado: Padrão
+
+--- Starting session Sun Nov 23 14:47:15 2025 ---
+[2025-11-23 14:47:17] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:47:21] [INFO] Esquema de cores aplicado: Moderno
+
+--- Starting session Sun Nov 23 14:47:38 2025 ---
+[2025-11-23 14:47:39] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:47:43] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:47:44] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:47:45] [INFO] Esquema de cores aplicado: Moderno
+
+--- Starting session Sun Nov 23 14:49:30 2025 ---
+[2025-11-23 14:49:31] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:49:36] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:49:37] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:49:41] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:49:42] [INFO] Esquema de cores aplicado: Moderno
+
+--- Starting session Sun Nov 23 14:50:47 2025 ---
+[2025-11-23 14:50:48] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:50:58] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:50:59] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:51:01] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:51:04] [INFO] Esquema de cores aplicado: Moderno
+
+--- Starting session Sun Nov 23 14:51:21 2025 ---
+[2025-11-23 14:51:22] [ERROR] Erro aplicando esquema de cores: [Errno 2] No such file or directory: 'themes/modernoa.jsona'
+[2025-11-23 14:51:27] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:51:29] [ERROR] Erro aplicando esquema de cores: [Errno 2] No such file or directory: 'themes/modernoa.jsona'
+[2025-11-23 14:51:33] [ERROR] Erro aplicando esquema de cores: [Errno 2] No such file or directory: 'themes/modernoa.jsona'
+
+--- Starting session Sun Nov 23 14:52:44 2025 ---
+[2025-11-23 14:52:46] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:52:50] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:52:51] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:52:53] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:53:00] [INFO] Esquema de cores aplicado: Vibrante
+[2025-11-23 14:53:03] [INFO] Esquema de cores aplicado: Suave
+[2025-11-23 14:53:05] [INFO] Esquema de cores aplicado: Escuro Total
+[2025-11-23 14:53:08] [INFO] Esquema de cores aplicado: Vibrante
+[2025-11-23 14:53:09] [INFO] Esquema de cores aplicado: Suave
+
+--- Starting session Sun Nov 23 14:54:13 2025 ---
+[2025-11-23 14:54:15] [INFO] Esquema de cores aplicado: Suave
+[2025-11-23 14:54:20] [INFO] Esquema de cores aplicado: Escuro Total
+[2025-11-23 14:54:21] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:54:22] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:54:24] [INFO] Esquema de cores aplicado: Vibrante
+
+--- Starting session Sun Nov 23 14:55:33 2025 ---
+[2025-11-23 14:55:34] [INFO] Esquema de cores aplicado: Vibrante
+[2025-11-23 14:55:54] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:55:55] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:55:58] [INFO] Esquema de cores aplicado: Vibrante
+[2025-11-23 14:56:00] [INFO] Esquema de cores aplicado: Suave
+[2025-11-23 14:56:03] [INFO] Esquema de cores aplicado: Moderno
+
+--- Starting session Sun Nov 23 14:57:03 2025 ---
+[2025-11-23 14:57:04] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:57:09] [INFO] Esquema de cores aplicado: Vibrante
+[2025-11-23 14:57:12] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:57:13] [INFO] Esquema de cores aplicado: Suave
+[2025-11-23 14:57:16] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:57:17] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:57:18] [INFO] Esquema de cores aplicado: Vibrante
+[2025-11-23 14:57:20] [INFO] Esquema de cores aplicado: Padrão
+
+--- Starting session Sun Nov 23 14:57:33 2025 ---
+[2025-11-23 14:57:34] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:57:39] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:57:40] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:57:41] [INFO] Esquema de cores aplicado: Vibrante
+[2025-11-23 14:57:44] [INFO] Esquema de cores aplicado: Suave
+[2025-11-23 14:57:45] [INFO] Esquema de cores aplicado: Escuro Total
+[2025-11-23 14:57:48] [INFO] Esquema de cores aplicado: Suave
+
+--- Starting session Sun Nov 23 14:58:45 2025 ---
+[2025-11-23 14:58:47] [INFO] Esquema de cores aplicado: Suave
+
+--- Starting session Sun Nov 23 14:59:04 2025 ---
+[2025-11-23 14:59:05] [INFO] Esquema de cores aplicado: Suave
+[2025-11-23 14:59:09] [INFO] Esquema de cores aplicado: Suave
+[2025-11-23 14:59:11] [INFO] Esquema de cores aplicado: Padrão
+[2025-11-23 14:59:13] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:59:15] [INFO] Esquema de cores aplicado: Vibrante
+[2025-11-23 14:59:21] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:59:24] [INFO] Esquema de cores aplicado: Vibrante
+[2025-11-23 14:59:26] [INFO] Esquema de cores aplicado: Moderno
+[2025-11-23 14:59:32] [INFO] Configurações salvas com sucesso
+[2025-11-23 14:59:38] [INFO] Verificando atualizações...
+[2025-11-23 14:59:38] [DEBUG] Verificando atualização em https://raw.githubusercontent.com/yourrepo/streamdeck/main/version.json
+[2025-11-23 14:59:38] [ERROR] Erro ao checar atualização: Erro HTTP desconhecido - Servidor não disponível

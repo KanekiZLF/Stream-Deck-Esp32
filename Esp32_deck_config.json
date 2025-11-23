@@ -72,9 +72,8 @@
     },
     "appearance": {
         "theme": "Dark",
-        "icon_size": 64,
         "transparency": 1.0,
-        "color_scheme": "Escuro Total",
+        "color_scheme": "Moderno",
         "font_size": "Médio"
     },
     "update": {

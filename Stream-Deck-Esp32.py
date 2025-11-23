@@ -864,7 +864,21 @@ class Esp32DeckApp(ctk.CTk):
         self.action_manager = ActionManager(self.logger)
         self.serial_manager = SerialManager(self.config, self.logger, on_message=self._on_serial_message)
         self.update_checker = UpdateChecker(self.config, self.logger)
-        
+
+        self.colors = {
+            "primary": "#2B5B84",
+            "secondary": "#3D8BC2", 
+            "success": "#28A745",
+            "warning": "#FFC107",
+            "danger": "#DC3545",
+            "dark": "#343A40",
+            "light": "#F8F9FA",
+            "text": "#FFFFFF" # Adicionado para controle de texto
+        }
+
+        # Configuração inicial de fonte
+        self.current_font_size = 14
+
         # UI state
         self.button_frames: Dict[str, Dict[str, Any]] = {}
 
@@ -892,7 +906,80 @@ class Esp32DeckApp(ctk.CTk):
             self.attributes('-alpha', transparency)
         except Exception:
             pass
+    
+    def _recursive_update_widgets(self, widget):
+        """
+        Percorre recursivamente todos os widgets para atualizar cores e fontes.
+        """
+        try:
+            # --- 1. ATUALIZAÇÃO DE CORES (BOTÕES) ---
+            if isinstance(widget, ctk.CTkButton):
+                text = widget.cget("text")
+                
+                # Definição de cores baseada no texto do botão (Lógica Semântica)
+                if text in ["💾 Salvar", "🔗 Conectar", "▶️ Testar"]:
+                    widget.configure(fg_color=self.colors["success"], 
+                                   hover_color=self._adjust_brightness(self.colors["success"], 0.8))
+                                   
+                elif text in ["🚫 Cancelar", "🔓 Desconectar", "Fechar"]:
+                    widget.configure(fg_color=self.colors["danger"],
+                                   hover_color=self._adjust_brightness(self.colors["danger"], 0.8))
+                                   
+                elif text in ["🔄 Atualizar", "🔄 Restaurar Padrões", "🔄 Atualizar Portas"]:
+                    widget.configure(fg_color=self.colors["warning"],
+                                   hover_color=self._adjust_brightness(self.colors["warning"], 0.8))
+                
+                else:
+                    # Para TODOS os outros botões (Configurar, botões do menu, etc.)
+                    # Usamos a cor PRIMÁRIA do tema escolhido
+                    widget.configure(fg_color=self.colors["primary"],
+                                   hover_color=self._adjust_brightness(self.colors["primary"], 0.8))
 
+            # --- 2. ATUALIZAÇÃO DE CORES (OUTROS WIDGETS) ---
+            # Exemplo: Se você quiser mudar a cor das bordas dos Frames
+            elif isinstance(widget, ctk.CTkFrame):
+                # Se o frame tiver borda colorida, atualiza para a secundária
+                if widget.cget("border_width") > 0:
+                    widget.configure(border_color=self.colors["secondary"])
+            
+            # --- 3. ATUALIZAÇÃO DE FONTES (MANTENDO O QUE JÁ FUNCIONA) ---
+            try:
+                if hasattr(widget, 'configure') and hasattr(self, 'current_font_size'):
+                     # Cria fonte nova mantendo a família original se possível
+                    current_font = widget.cget("font")
+                    if isinstance(current_font, ctk.CTkFont):
+                        new_font = ctk.CTkFont(family=current_font.cget("family"), 
+                                             size=self.current_font_size,
+                                             weight=current_font.cget("weight"))
+                    else:
+                        new_font = ctk.CTkFont(size=self.current_font_size)
+                    
+                    widget.configure(font=new_font)
+            except Exception:
+                pass
+
+            # --- RECURSÃO (Entrar nos filhos do widget atual) ---
+            for child in widget.winfo_children():
+                self._recursive_update_widgets(child)
+
+        except Exception as e:
+            # Ignora erros pontuais para não travar a aplicação
+            pass
+
+    # Função auxiliar para criar cor de hover (escurecer um pouco)
+    def _adjust_brightness(self, hex_color, factor):
+        try:
+            # Remove #
+            hex_color = hex_color.lstrip('#')
+            # Converte para RGB
+            rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+            # Ajusta brilho
+            new_rgb = tuple(min(255, max(0, int(c * factor))) for c in rgb)
+            # Retorna Hex
+            return '#{:02x}{:02x}{:02x}'.format(*new_rgb)
+        except:
+            return hex_color # Retorna original se falhar
+        
     def _load_appearance_settings(self):
         """Carrega as configurações de aparência salvas"""
         try:
@@ -965,95 +1052,133 @@ class Esp32DeckApp(ctk.CTk):
             self.config.data['appearance']['transparency'] = value
             self.config.save()
         except Exception as e:
+
             self.logger.error(f"Erro ao alterar transparência: {e}")
-
+    # Muda as cores do tema
     def _on_color_scheme_change(self, value):
-        """Altera o esquema de cores"""
+        """Aplica esquema de cores e atualiza variáveis"""
         try:
-            # ✅ IMPLEMENTAÇÃO REAL - Criar temas customizados
-            if value == 'Padrão':
-                ctk.set_default_color_theme("dark-blue")
-            elif value == 'Moderno':
-                # Tema azul moderno
-                self._apply_custom_theme({
-                    "CTk": {"fg_color": ["#2B2B2B", "#1E1E1E"]},
-                    "CTkButton": {"fg_color": ["#3B8ED0", "#1F6AA5"], "hover_color": ["#36719F", "#144870"]},
-                    "CTkFrame": {"fg_color": ["#2B2B2B", "#1E1E1E"]}
-                })
-            elif value == 'Vibrante':
-                # Tema verde vibrante
-                self._apply_custom_theme({
-                    "CTk": {"fg_color": ["#2B2B2B", "#1E1E1E"]},
-                    "CTkButton": {"fg_color": ["#28A745", "#1E7E34"], "hover_color": ["#218838", "#155724"]},
-                    "CTkFrame": {"fg_color": ["#2B2B2B", "#1E1E1E"]}
-                })
-            elif value == 'Suave':
-                # Tema roxo suave
-                self._apply_custom_theme({
-                    "CTk": {"fg_color": ["#2B2B2B", "#1E1E1E"]},
-                    "CTkButton": {"fg_color": ["#6F42C1", "#5A2D91"], "hover_color": ["#5A2D91", "#4A2378"]},
-                    "CTkFrame": {"fg_color": ["#2B2B2B", "#1E1E1E"]}
-                })
-            elif value == 'Escuro Total':
-                # Tema completamente escuro
-                self._apply_custom_theme({
-                    "CTk": {"fg_color": ["#1A1A1A", "#0D0D0D"]},
-                    "CTkButton": {"fg_color": ["#333333", "#222222"], "hover_color": ["#444444", "#2A2A2A"]},
-                    "CTkFrame": {"fg_color": ["#1A1A1A", "#0D0D0D"]}
-                })
-            
-            # ✅ FORÇAR ATUALIZAÇÃO
-            self.update()
-            
-            if 'appearance' not in self.config.data:
-                self.config.data['appearance'] = {}
-            self.config.data['appearance']['color_scheme'] = value
-            self.config.save()
-            
-            self.logger.info(f"Esquema de cores alterado para: {value}")
-        except Exception as e:
-            self.logger.error(f"Erro ao alterar esquema de cores: {e}")
+            # NOVAS PALETAS: Fundo Escuro + Cores Vivas (Alto Contraste)
+            palettes = {
+                "Padrão": {
+                    # Azul profissional + acentos equilibrados
+                    "primary":   "#510DCF",  # Azul mais elegante e profundo
+                    "secondary": "#1E719E",  # Azul claro suave e coerente
+                    "success":   "#007430",  # Verde sucesso mais moderno
+                    "danger":    "#EB2711",  # Vermelho padrão UI moderno
+                    "warning":   "#FC6703"   # Amarelo consistente
+                },
 
-    def _on_font_size_change(self, value):
-        """Altera o tamanho da fonte global"""
-        try:
-            size_map = {
-                'Pequeno': 12,
-                'Médio': 14, 
-                'Grande': 16
+                "Moderno": {
+                    # Azul elétrico + roxo neon futurista (material design avançado)
+                    "primary": "#000981",    # Azul profundo e moderno
+                    "secondary": "#4527A0",  # Roxo escuro elegante
+                    "success": "#0D8040",    # Verde escuro sofisticado
+                    "danger": "#C62828",     # Vermelho escuro intenso
+                    "warning": "#915E00"     # Âmbar escuro moderno
+                },
+
+                "Vibrante": {
+                    # Cyber-neon porém mais equilibrado aos olhos
+                    "primary":   "#FF007F",  # Rosa neon limpo
+                    "secondary": "#00D4FF",  # Ciano neon refinado
+                    "success":   "#39FF14",  # Verde neon mais legível
+                    "danger":    "#FF0033",  # Vermelho neon puro
+                    "warning":   "#FFE600"   # Amarelo energético mais uniforme
+                },
+
+                "Suave": {
+                    # Baseado no Dracula, porém suavizado e mais harmônico
+                    "primary":   "#C0A9F7",  # Roxo suave pastel
+                    "secondary": "#6C7BB1",  # Azul acinzentado suave
+                    "success":   "#69F9A6",  # Verde menta claro
+                    "danger":    "#FF6C6C",  # Vermelho suave
+                    "warning":   "#FAF48B"   # Amarelo pastel mais agradável
+                },
+
+                "Escuro Total": {
+                    # Minimalismo total com tons controlados de acento
+                    "primary":   "#3C4043",  # Cinza grafite elegante
+                    "secondary": "#191C1F",  # Preto grafite
+                    "success":   "#2E7D32",  # Verde escuro com boa legibilidade
+                    "danger":    "#C62828",  # Vermelho escuro vibrante
+                    "warning":   "#EF6C00"   # Laranja escuro mais uniforme
+                },
+
+                "Premium": {
+                    # Nova paleta exclusiva — elegante e profissional
+                    "primary":   "#0A84FF",  # Azul Apple-like
+                    "secondary": "#5E5CE6",  # Roxo premium
+                    "success":   "#32D74B",  # Verde claro premium
+                    "danger":    "#FF453A",  # Vermelho Apple-like
+                    "warning":   "#FFD60A"   # Amarelo vibrante elegante
+                }
+            }
+
+
+            # 1. Carregar tema do arquivo JSON
+            theme_file_map = {
+                "Padrão": "dark-blue",
+                "Moderno": "themes/moderno.json",
+                "Vibrante": "themes/vibrante.json",
+                "Suave": "themes/suavea.json",
+                "Escuro Total": "themes/escuro_total.json"
             }
             
-            new_size = size_map.get(value, 14)
+            selected_theme_file = theme_file_map.get(value, "dark-blue")
             
-            # ✅ APLICAR EM ALGUNS ELEMENTOS CHAVE (simplificado)
-            try:
-                # Atualizar fonte do header
-                for widget in self.winfo_children():
-                    if hasattr(widget, 'winfo_children'):
-                        for child in widget.winfo_children():
-                            if isinstance(child, ctk.CTkLabel):
-                                current_font = child.cget("font")
-                                if isinstance(current_font, ctk.CTkFont):
-                                    new_font = ctk.CTkFont(
-                                        family=current_font._family,
-                                        size=new_size,
-                                        weight=current_font._weight
-                                    )
-                                    child.configure(font=new_font)
-            except Exception as font_error:
-                self.logger.debug(f"Ajuste de fonte parcial: {font_error}")
-            
-            if 'appearance' not in self.config.data:
-                self.config.data['appearance'] = {}
-            self.config.data['appearance']['font_size'] = value
+            if selected_theme_file.endswith(".json"):
+                if os.path.exists(selected_theme_file):
+                    ctk.set_default_color_theme(selected_theme_file)
+                else:
+                    ctk.set_default_color_theme("dark-blue")
+            else:
+                ctk.set_default_color_theme(selected_theme_file)
+
+            # 2. Atualizar cores na memória
+            if value in palettes:
+                self.colors.update(palettes[value])
+
+            # 3. Forçar atualização visual
+            self._recursive_update_widgets(self)
+
+            # Salvar
+            if "appearance" not in self.config.data:
+                self.config.data["appearance"] = {}
+            self.config.data["appearance"]["color_scheme"] = value
             self.config.save()
-            
-            self.logger.info(f"Tamanho da fonte alterado para: {value}")
-            messagebox.showinfo("Configuração Aplicada", 
-                            f"Tamanho da fonte alterado para '{value}'. Alguns elementos podem requerer reinício para aplicação completa.")
-            
+
+            self.logger.info(f"Esquema de cores aplicado: {value}")
+            self.update()
+
         except Exception as e:
-            self.logger.error(f"Erro ao alterar tamanho da fonte: {e}")
+            self.logger.error(f"Erro aplicando esquema de cores: {e}")
+
+
+    def _on_font_size_change(self, value):
+            """Altera o tamanho da fonte global e atualiza a UI"""
+            try:
+                size_map = {
+                    'Pequeno': 12,
+                    'Médio': 14, 
+                    'Grande': 18 # Aumentei um pouco para ser mais visível
+                }
+                
+                self.current_font_size = size_map.get(value, 14)
+                
+                # Chama a atualização recursiva
+                self._recursive_update_widgets(self)
+                
+                # Salva na config
+                if 'appearance' not in self.config.data:
+                    self.config.data['appearance'] = {}
+                self.config.data['appearance']['font_size'] = value
+                self.config.save()
+                
+                self.logger.info(f"Fonte alterada para: {value} ({self.current_font_size}px)")
+                
+            except Exception as e:
+                self.logger.error(f"Erro ao alterar tamanho da fonte: {e}")
 
     def _reset_appearance(self):
         """Restaura todas as configurações de aparência para os padrões"""

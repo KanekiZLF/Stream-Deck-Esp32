@@ -1,0 +1,34 @@
+{
+  "CTk": { "fg_color": ["#EBEBEB", "#050505"] },
+  "CTkToplevel": { "fg_color": ["#EBEBEB", "#050505"] },
+  "CTkFrame": {
+    "corner_radius": 10, "border_width": 1,
+    "fg_color": ["#FFFFFF", "#141414"],
+    "top_fg_color": ["#FFFFFF", "#141414"],
+    "border_color": ["#979DA2", "#333333"]
+  },
+  "CTkButton": {
+    "corner_radius": 6, "border_width": 1,
+    "fg_color": ["#212121", "#212121"],
+    "hover_color": ["#424242", "#424242"],
+    "border_color": ["#555", "#555"],
+    "text_color": ["#FFFFFF", "#FFFFFF"]
+  },
+  "CTkLabel": { "fg_color": "transparent", "text_color": ["#000000", "#E0E0E0"] },
+  "CTkEntry": {
+    "corner_radius": 6, "border_width": 1,
+    "fg_color": ["#F9F9FA", "#000000"],
+    "border_color": ["#979DA2", "#333333"],
+    "text_color": ["#000000", "#FFFFFF"]
+  },
+  "CTkOptionMenu": {
+    "corner_radius": 6, "fg_color": ["#212121", "#212121"],
+    "button_color": ["#000000", "#000000"],
+    "text_color": ["#FFFFFF", "#FFFFFF"]
+  },
+  "CTkFont": {
+    "Windows": { "family": "Roboto", "size": 13, "weight": "normal" }
+  },
+  "CTkScrollbar": { "fg_color": "transparent", "button_color": ["#999", "#333"] },
+  "CTkTextbox": { "fg_color": ["#F9F9FA", "#000000"], "text_color": ["#000", "#FFF"] }
+}
