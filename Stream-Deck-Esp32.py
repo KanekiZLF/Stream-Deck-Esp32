@@ -203,26 +203,32 @@ class ConfigManager:
 # -----------------------------
 class IconLoader:
     def __init__(self, icon_size: tuple = ICON_SIZE):
-        self.cache: Dict[str, ctk.CTkImage] = {}  # ✅ Mudei para CTkImage
+        self.cache: Dict[str, ctk.CTkImage] = {}
         self.icon_size = icon_size
 
     def load_icon_from_path(self, path: str) -> Optional[ctk.CTkImage]:
-        if not path:
+        if not path or not os.path.exists(path):
             return None
+            
         if path in self.cache:
             return self.cache[path]
+            
         try:
             img = Image.open(path).convert('RGBA')
+            # ✅ CORREÇÃO: Usar resize em vez de thumbnail para manter proporção
             img.thumbnail(self.icon_size, Image.LANCZOS)
-            # ✅ CORREÇÃO: Usar CTkImage em vez de PhotoImage
+            
+            # ✅ CORREÇÃO: Criar CTkImage com tamanho correto
             ctk_img = ctk.CTkImage(
                 light_image=img,
                 dark_image=img,
-                size=self.icon_size
+                size=img.size  # Usar o tamanho real da imagem após thumbnail
             )
             self.cache[path] = ctk_img
             return ctk_img
-        except Exception:
+            
+        except Exception as e:
+            print(f"Erro ao carregar ícone {path}: {e}")
             return None
 
     def try_load_windows_exe_icon(self, exe_path: str) -> Optional[ctk.CTkImage]:
@@ -275,6 +281,7 @@ class IconLoader:
             return out_png_path
         except Exception:
             return None
+
 # -----------------------------
 # Actions
 # -----------------------------
@@ -589,6 +596,254 @@ class AboutDialog(ctk.CTkToplevel):
             messagebox.showerror("Erro", f"Não foi possível abrir o GitHub:\n{str(e)}")
 
 # -----------------------------
+# Button Config Dialog
+# -----------------------------
+class ButtonConfigDialog(ctk.CTkToplevel):
+    def __init__(self, parent: Esp32DeckApp, button_key: str, conf: Dict[str, Any], icon_loader: IconLoader, logger: Logger):
+        super().__init__(parent)
+        self.parent = parent
+        self.button_key = button_key
+        self.conf = conf
+        self.icon_loader = icon_loader
+        self.logger = logger
+        
+        self.title(f'Configurar Botão {button_key}')
+        self.geometry('520x400')  # Aumentei um pouco para acomodar melhor
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+        
+        self._center_window()
+        
+        self.label_var = tk.StringVar(value=self.conf.get('label', f'Botão {button_key}'))
+        self.icon_path = self.conf.get('icon', '')
+        self.action_type = tk.StringVar(value=self.conf.get('action', {}).get('type', 'none'))
+        self._initial_payload = self.conf.get('action', {}).get('payload', '')
+        
+        try:
+            self.action_payload = tk.StringVar(value=json.dumps(self._initial_payload, ensure_ascii=False) if isinstance(self._initial_payload, (dict, list)) else str(self._initial_payload))
+        except Exception:
+            self.action_payload = tk.StringVar(value=str(self._initial_payload))
+
+        self._build()
+
+    def _center_window(self):
+        self.update_idletasks()
+        width = self.winfo_width()
+        height = self.winfo_height()
+        x = (self.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.winfo_screenheight() // 2) - (height // 2)
+        self.geometry(f'{width}x{height}+{x}+{y}')
+
+    def _build(self):
+        main_frame = ctk.CTkFrame(self, corner_radius=10)
+        main_frame.pack(fill='both', expand=True, padx=15, pady=15)
+
+        # Button label
+        ctk.CTkLabel(main_frame, text='Nome do Botão:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', pady=(5, 0))
+
+        # ✅ FUNÇÃO DE VALIDAÇÃO
+        def on_name_change(*args):
+            current_text = self.label_var.get()
+            if len(current_text) > 16:
+                # Corta o texto e atualiza a variável
+                self.label_var.set(current_text[:16])
+                # Opcional: mostrar tooltip ou mensagem
+                name_entry.configure(border_color=COLORS["warning"])
+                self.after(1000, lambda: name_entry.configure(border_color=ctk.ThemeManager.theme["CTkEntry"]["border_color"]))
+            else:
+                name_entry.configure(border_color=ctk.ThemeManager.theme["CTkEntry"]["border_color"])
+
+        # ✅ ENTRY com limite
+        name_entry = ctk.CTkEntry(
+            main_frame, 
+            textvariable=self.label_var, 
+            width=400, 
+            placeholder_text="Máximo 16 caracteres"
+        )
+        name_entry.pack(fill='x', pady=5)
+
+        # ✅ VINCULAR VALIDAÇÃO
+        self.label_var.trace('w', on_name_change)
+
+        # Program section
+        icon_frame = ctk.CTkFrame(main_frame, corner_radius=8)
+        icon_frame.pack(fill='x', pady=10)
+
+        ctk.CTkLabel(icon_frame, text='Programa a ser executado:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', padx=10, pady=10)
+
+        icon_content = ctk.CTkFrame(icon_frame, fg_color="transparent")
+        icon_content.pack(fill='x', padx=10, pady=5)
+        
+        self.icon_preview = ctk.CTkLabel(icon_content, text='📱', width=64, height=64, 
+                                       font=ctk.CTkFont(size=20), text_color=COLORS["primary"])
+        self.icon_preview.pack(side='left', padx=10)
+
+        btn_frame = ctk.CTkFrame(icon_content, fg_color="transparent")
+        btn_frame.pack(side='left', padx=10)
+
+        # Botões lado a lado
+        ctk.CTkButton(btn_frame, text='Escolher Ícone', width=140,
+                    command=self._choose_icon).pack(side='left', padx=5)
+        ctk.CTkButton(btn_frame, text='Selecionar Programa', width=140,
+                    command=self._select_program_for_button).pack(side='left', padx=5)
+
+        # Action type
+        '''
+        action_frame = ctk.CTkFrame(main_frame, corner_radius=8)
+        action_frame.pack(fill='x', pady=10)
+        
+        action_content = ctk.CTkFrame(action_frame, fg_color="transparent")
+        action_content.pack(fill='x', padx=10, pady=10)
+        
+        ctk.CTkLabel(action_content, text='Tipo de Ação:', font=ctk.CTkFont(weight="bold")).pack(side='left')
+        action_menu = ctk.CTkOptionMenu(action_content, 
+                                      values=['none','open_program','open_url','run_cmd','type_text','hotkey','script','macro'], 
+                                      variable=self.action_type, width=200)
+        action_menu.pack(side='left', padx=10)
+        '''
+
+        # Localização do programa / payload
+        payload_frame = ctk.CTkFrame(main_frame, corner_radius=8)
+        payload_frame.pack(fill='x', pady=10)
+
+        ctk.CTkLabel(payload_frame, text='Localização do programa:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', padx=10, pady=(10, 5))
+        
+        # ✅ CORREÇÃO: Usar Entry em vez de Textbox para evitar scroll e campo grande
+        self.payload_entry = ctk.CTkEntry(payload_frame, height=35)
+        self.payload_entry.pack(fill='x', padx=10, pady=(0, 10))
+        
+        if isinstance(self._initial_payload, (dict, list)):
+            try:
+                self.payload_entry.insert(0, json.dumps(self._initial_payload, ensure_ascii=False))
+            except Exception:
+                self.payload_entry.insert(0, str(self._initial_payload))
+        else:
+            self.payload_entry.insert(0, str(self._initial_payload))
+
+        # Buttons - ✅ CORREÇÃO: Botões centralizados e organizados
+        buttons_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        buttons_frame.pack(fill='x', pady=10)
+
+        # Frame interno para centralização
+        inner_buttons_frame = ctk.CTkFrame(buttons_frame, fg_color="transparent")
+        inner_buttons_frame.pack(expand=True)
+
+        # Botão Testar - ESQUERDA
+        test_btn = ctk.CTkButton(inner_buttons_frame, text='▶️ Testar', command=self._test_action,
+                                fg_color=COLORS["primary"], width=100)
+        test_btn.pack(side='left', padx=5)
+
+        # Botão Cancelar - CENTRO
+        cancel_btn = ctk.CTkButton(inner_buttons_frame, text='🚫 Cancelar', command=self.destroy,
+                                fg_color=COLORS["danger"], width=100)
+        cancel_btn.pack(side='left', padx=20)
+
+        # Botão Salvar - DIREITA
+        save_btn = ctk.CTkButton(inner_buttons_frame, text='💾 Salvar', command=self._save_and_close,
+                                fg_color=COLORS["success"], width=100)
+        save_btn.pack(side='left', padx=5)
+
+        self._refresh_icon_preview()
+
+    def _select_program_for_button(self):
+        exe_path = filedialog.askopenfilename(
+            title=f"Selecione o executável para o Botão {self.button_key}", 
+            filetypes=[("Executáveis", "*.exe"), ("Todos", "*.*")]
+        )
+        if not exe_path:
+            return
+        
+        self.payload_entry.delete(0, 'end')
+        self.payload_entry.insert(0, exe_path)
+
+        basename = os.path.splitext(os.path.basename(exe_path))[0]
+        safe_makedirs(ICON_FOLDER)
+        out_png = os.path.join(ICON_FOLDER, f"btn{self.button_key}_{basename}.png")
+        extracted = self.icon_loader.extract_icon_to_png(exe_path, out_png, size=128)
+        
+        if extracted:
+            self.icon_path = extracted
+            self.conf['icon'] = self.icon_path
+            self.conf['action'] = {'type': 'open_program', 'payload': exe_path}
+            try:
+                self.parent.config.save()
+            except Exception:
+                pass
+            self._refresh_icon_preview()
+            messagebox.showinfo("Ícone extraído", f"Ícone extraído e salvo em:\n{extracted}")
+        else:
+            self.conf['action'] = {'type': 'open_program', 'payload': exe_path}
+            try:
+                self.parent.config.save()
+            except Exception:
+                pass
+            messagebox.showwarning("Extração falhou", "Não foi possível extrair o ícone do executável.")
+
+    def _choose_icon(self):
+        path = filedialog.askopenfilename(
+            title='Escolher ícone', 
+            filetypes=[('Images', '*.png *.jpg *.ico'), ('All', '*.*')]
+        )
+        if not path:
+            return
+        self.icon_path = path
+        self.conf['icon'] = self.icon_path
+        try:
+            self.parent.config.save()
+        except Exception:
+            pass
+        self._refresh_icon_preview()
+
+    def _refresh_icon_preview(self):
+        """Update icon preview display"""
+        ctk_img = self.icon_loader.load_icon_from_path(self.icon_path) if self.icon_path else None
+        
+        if ctk_img:
+            # ✅ CORREÇÃO: Configurar CTkImage corretamente
+            self.icon_preview.configure(image=ctk_img, text='')
+        else:
+            # ✅ CORREÇÃO: Não usar string como imagem
+            self.icon_preview.configure(image='', text='📱')
+
+    def _save_and_close(self):
+        """✅ NOVA FUNÇÃO: Salva e fecha a janela"""
+        try:
+            raw = self.payload_entry.get().strip()
+            try:
+                payload = json.loads(raw) if raw else ''
+            except Exception:
+                payload = raw
+
+            self.conf['label'] = self.label_var.get()
+            if 'icon' not in self.conf:
+                self.conf['icon'] = self.icon_path
+
+            self.conf['action'] = {'type': 'open_program', 'payload': payload}
+
+            self.conf['action'] = {'type': self.action_type.get(), 'payload': payload}
+            self.parent.config.save()
+            self.logger.info(f'Botão {self.button_key} salvo: {self.conf}')
+            self.destroy()  # ✅ Fecha a janela após salvar
+        except Exception as e:
+            messagebox.showerror('Erro', str(e))
+
+    def _save(self):
+        """Função original mantida para compatibilidade"""
+        self._save_and_close()
+
+    def _test_action(self):
+        raw = self.payload_entry.get().strip()
+        try:
+            payload = json.loads(raw) if raw else ''
+        except Exception:
+            payload = raw
+        
+        # ✅ DEFINIR AUTOMATICAMENTE COMO 'open_program'
+        action = Action('open_program', payload)
+        self.parent.action_manager.perform(action)
+
+# -----------------------------
 # GUI / App
 # -----------------------------
 class Esp32DeckApp(ctk.CTk):
@@ -610,39 +865,6 @@ class Esp32DeckApp(ctk.CTk):
         self.serial_manager = SerialManager(self.config, self.logger, on_message=self._on_serial_message)
         self.update_checker = UpdateChecker(self.config, self.logger)
         
-        # Cenraliza a janela
-        self._center_window()
-
-    def _center_window(self):
-        """Centraliza a janela na tela após a UI estar construída"""
-        # Espera a janela ser renderizada
-        self.update_idletasks()
-        
-        # Obtém as dimensões da tela
-        screen_width = self.winfo_screenwidth()
-        screen_height = self.winfo_screenheight()
-        
-        # Obtém as dimensões atuais da janela
-        window_width = self.winfo_width()
-        window_height = self.winfo_height()
-        
-        # Se as dimensões ainda não estiverem disponíveis, usa as dimensões solicitadas
-        if window_width == 1:  # Tkinter retorna 1 quando não renderizado
-            window_width = 900
-        if window_height == 1:
-            window_height = 700
-        
-        # Calcula a posição central
-        x = (screen_width - window_width) // 2
-        y = (screen_height - window_height) // 2
-        
-        # Define a posição da janela
-        self.geometry(f'+{x}+{y}')
-        
-        # Garante que a janela fique no topo
-        self.lift()
-        self.attributes('-topmost', True)
-        self.after_idle(lambda: self.attributes('-topmost', False))
         # UI state
         self.button_frames: Dict[str, Dict[str, Any]] = {}
 
@@ -655,14 +877,27 @@ class Esp32DeckApp(ctk.CTk):
         # Hook logger to textbox after it's created
         self.logger.textbox = self.log_textbox
 
+        # Centraliza a janela
+        self._center_window()
+
         # Refresh display
         self.refresh_all_buttons()
         self.update_serial_ports()
-        
-        
+
     def _setup_theme(self):
         """Configure custom theme colors"""
         ctk.set_default_color_theme("dark-blue")  # Base theme
+
+    def _center_window(self):
+        """Centraliza a janela na tela de forma simples"""
+        self.update_idletasks()
+        
+        # Calcula posição central
+        x = (self.winfo_screenwidth() // 2) - (900 // 2)
+        y = (self.winfo_screenheight() // 2) - (700 // 2)
+        
+        # Define a posição
+        self.geometry(f'+{x}+{y}')
 
     # -----------------------------
     # UI Construction
@@ -717,13 +952,13 @@ class Esp32DeckApp(ctk.CTk):
         ctk.CTkButton(btn_frame, text="💾 Salvar", width=80, command=self._save_all, 
                      fg_color=COLORS["success"]).pack(side='right', padx=5)
         ctk.CTkButton(btn_frame, text="🔄 Atualizar", width=80, command=self.refresh_all).pack(side='right', padx=5)
-
+    
     def _build_buttons_tab(self, parent):
         # Instructions
         info_frame = ctk.CTkFrame(parent, corner_radius=8)
         info_frame.pack(fill='x', padx=10, pady=10)
         ctk.CTkLabel(info_frame, 
-                    text="💡 Clique em um botão para configurar sua ação. Arraste ícones ou escolha arquivos.",
+                    text="💡 Clique em 'Configurar' para definir a ação do botão.",
                     font=ctk.CTkFont(size=12)).pack(padx=10, pady=8)
         
         # Buttons Grid
@@ -736,37 +971,65 @@ class Esp32DeckApp(ctk.CTk):
         for i in range(2):
             grid_frame.grid_rowconfigure(i, weight=1)
 
+        # ✅ CORREÇÃO: Usar a nova função _create_button_frame
         btn_id = 1
         for row in range(2):
             for col in range(4):
                 key = str(btn_id)
-                btn_frame = ctk.CTkFrame(grid_frame, width=180, height=180, corner_radius=12, 
-                                       border_width=2, border_color=COLORS["secondary"])
-                btn_frame.grid(row=row, column=col, padx=8, pady=8, sticky='nsew')
-                btn_frame.grid_propagate(False)
-
-                # Icon
-                icon_label = ctk.CTkLabel(btn_frame, text='📱', width=80, height=80, 
-                                        font=ctk.CTkFont(size=24), text_color=COLORS["primary"])
-                icon_label.pack(pady=(15, 5))
-                
-                # Title
-                title_label = ctk.CTkLabel(btn_frame, text=f'Botão {btn_id}', 
-                                         font=ctk.CTkFont(size=14, weight="bold"))
-                title_label.pack(pady=(0, 5))
-                
-                # Configure button
-                config_btn = ctk.CTkButton(btn_frame, text='Configurar', width=120, height=28,
-                                         command=lambda i=key: self.open_button_config(i),
-                                         fg_color=COLORS["primary"], hover_color=COLORS["secondary"])
-                config_btn.pack(pady=(0, 15))
-
-                self.button_frames[key] = {
-                    'frame': btn_frame, 
-                    'icon_label': icon_label, 
-                    'title_label': title_label
-                }
+                self._create_button_frame(grid_frame, key, row, col)
                 btn_id += 1
+
+    def _create_button_frame(self, parent, key, row, col):
+        """Create individual button frame"""
+        btn_frame = ctk.CTkFrame(
+            parent, 
+            width=180, 
+            height=180, 
+            corner_radius=12, 
+            border_width=2, 
+            border_color=COLORS["secondary"]
+        )
+        btn_frame.grid(row=row, column=col, padx=8, pady=8, sticky='nsew')
+        btn_frame.grid_propagate(False)
+
+        # Icon
+        icon_label = ctk.CTkLabel(
+            btn_frame, 
+            text='📱', 
+            width=80, 
+            height=80, 
+            font=ctk.CTkFont(size=24), 
+            text_color=COLORS["primary"]
+        )
+        icon_label.pack(pady=(15, 5))
+        
+        # Title (apenas label, não editável)
+        btn_conf = self.config.data.get('buttons', {}).get(key, {})
+        saved_label = btn_conf.get('label', f'Botão {key}')
+        title_label = ctk.CTkLabel(
+            btn_frame, 
+            text=saved_label, 
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        title_label.pack(pady=(0, 5))
+        
+        # Configure button
+        config_btn = ctk.CTkButton(
+            btn_frame, 
+            text='Configurar', 
+            width=120, 
+            height=28,
+            command=lambda i=key: self.open_button_config(i),
+            fg_color=COLORS["primary"], 
+            hover_color=COLORS["secondary"]
+        )
+        config_btn.pack(pady=(0, 15))
+
+        self.button_frames[key] = {
+            'frame': btn_frame, 
+            'icon_label': icon_label, 
+            'title_label': title_label
+        }
 
     def _build_connection_tab(self, parent):
         main_frame = ctk.CTkFrame(parent, corner_radius=10)
@@ -904,20 +1167,19 @@ class Esp32DeckApp(ctk.CTk):
             label = btn_conf.get('label', f'Botão {key}')
             icon_path = btn_conf.get('icon', '')
             
+            # ✅ ATUALIZAR: Atualizar o título do label
+            widget_map['title_label'].configure(text=label)
+            
             # Carregar ícone
             ctk_img = self.icon_loader.load_icon_from_path(icon_path) if icon_path else None
             if not ctk_img and icon_path and icon_path.lower().endswith('.exe'):
                 ctk_img = self.icon_loader.try_load_windows_exe_icon(icon_path)
             
             # Atualizar UI
-            widget_map['title_label'].configure(text=label)
-            
             if ctk_img:
                 widget_map['icon_label'].configure(image=ctk_img, text='')
-                widget_map['icon_label'].image = ctk_img  # Manter referência
             else:
                 widget_map['icon_label'].configure(image='', text='📱')
-                widget_map['icon_label'].image = None  # Remover referência
 
     def open_button_config(self, button_key: str):
         if 'buttons' not in self.config.data:
@@ -1098,206 +1360,6 @@ class Esp32DeckApp(ctk.CTk):
         except Exception:
             pass
         self.destroy()
-
-# -----------------------------
-# Button Config Dialog
-# -----------------------------
-class ButtonConfigDialog(ctk.CTkToplevel):
-    def __init__(self, parent: Esp32DeckApp, button_key: str, conf: Dict[str, Any], icon_loader: IconLoader, logger: Logger):
-        super().__init__(parent)
-        self.parent = parent
-        self.button_key = button_key
-        self.conf = conf
-        self.icon_loader = icon_loader
-        self.logger = logger
-        
-        self.title(f'Configurar Botão {button_key}')
-        self.geometry('520x500')
-        self.resizable(False, False)
-        self.transient(parent)
-        self.grab_set()
-        
-        self._center_window()
-        
-        self.label_var = tk.StringVar(value=self.conf.get('label', f'Botão {button_key}'))
-        self.icon_path = self.conf.get('icon', '')
-        self.action_type = tk.StringVar(value=self.conf.get('action', {}).get('type', 'none'))
-        self._initial_payload = self.conf.get('action', {}).get('payload', '')
-        
-        try:
-            self.action_payload = tk.StringVar(value=json.dumps(self._initial_payload, ensure_ascii=False) if isinstance(self._initial_payload, (dict, list)) else str(self._initial_payload))
-        except Exception:
-            self.action_payload = tk.StringVar(value=str(self._initial_payload))
-
-        self._build()
-
-    def _center_window(self):
-        self.update_idletasks()
-        width = self.winfo_width()
-        height = self.winfo_height()
-        x = (self.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.winfo_screenheight() // 2) - (height // 2)
-        self.geometry(f'{width}x{height}+{x}+{y}')
-
-    def _build(self):
-        main_frame = ctk.CTkFrame(self, corner_radius=10)
-        main_frame.pack(fill='both', expand=True, padx=15, pady=15)
-
-        # Button label
-        ctk.CTkLabel(main_frame, text='Nome do Botão:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', pady=(5, 0))
-        ctk.CTkEntry(main_frame, textvariable=self.label_var, width=400).pack(fill='x', pady=5)
-
-        # Icon section
-        icon_frame = ctk.CTkFrame(main_frame, corner_radius=8)
-        icon_frame.pack(fill='x', pady=10)
-        
-        ctk.CTkLabel(icon_frame, text='Ícone:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', padx=10, pady=10)
-        
-        icon_content = ctk.CTkFrame(icon_frame, fg_color="transparent")
-        icon_content.pack(fill='x', padx=10, pady=5)
-        
-        self.icon_preview = ctk.CTkLabel(icon_content, text='📱', width=64, height=64, 
-                                       font=ctk.CTkFont(size=20), text_color=COLORS["primary"])
-        self.icon_preview.pack(side='left', padx=10)
-
-        btn_frame = ctk.CTkFrame(icon_content, fg_color="transparent")
-        btn_frame.pack(side='left', padx=10)
-        
-        ctk.CTkButton(btn_frame, text='Selecionar Programa', width=140,
-                     command=self._select_program_for_button).pack(pady=2)
-        ctk.CTkButton(btn_frame, text='Escolher Ícone', width=140,
-                     command=self._choose_icon).pack(pady=2)
-
-        # Action type
-        action_frame = ctk.CTkFrame(main_frame, corner_radius=8)
-        action_frame.pack(fill='x', pady=10)
-        
-        action_content = ctk.CTkFrame(action_frame, fg_color="transparent")
-        action_content.pack(fill='x', padx=10, pady=10)
-        
-        ctk.CTkLabel(action_content, text='Tipo de Ação:', font=ctk.CTkFont(weight="bold")).pack(side='left')
-        action_menu = ctk.CTkOptionMenu(action_content, 
-                                      values=['none','open_program','open_url','run_cmd','type_text','hotkey','script','macro'], 
-                                      variable=self.action_type, width=200)
-        action_menu.pack(side='left', padx=10)
-
-        # Payload
-        payload_frame = ctk.CTkFrame(main_frame, corner_radius=8)
-        payload_frame.pack(fill='both', expand=True, pady=10)
-        
-        ctk.CTkLabel(payload_frame, text='Configuração da Ação:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', padx=10, pady=(10, 5))
-        
-        self.payload_box = ctk.CTkTextbox(payload_frame, height=120)
-        self.payload_box.pack(fill='both', expand=True, padx=10, pady=(0, 10))
-        
-        if isinstance(self._initial_payload, (dict, list)):
-            try:
-                self.payload_box.insert('0.0', json.dumps(self._initial_payload, indent=2, ensure_ascii=False))
-            except Exception:
-                self.payload_box.insert('0.0', str(self._initial_payload))
-        else:
-            self.payload_box.insert('0.0', str(self._initial_payload))
-
-        # Buttons
-        buttons_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        buttons_frame.pack(fill='x', pady=10)
-        
-        ctk.CTkButton(buttons_frame, text='💾 Salvar', command=self._save,
-                     fg_color=COLORS["success"]).pack(side='left', padx=5)
-        ctk.CTkButton(buttons_frame, text='🚫 Cancelar', command=self.destroy,
-                     fg_color=COLORS["danger"]).pack(side='left', padx=5)
-        ctk.CTkButton(buttons_frame, text='▶️ Testar', command=self._test_action,
-                     fg_color=COLORS["primary"]).pack(side='left', padx=5)
-
-        self._refresh_icon_preview()
-
-    def _select_program_for_button(self):
-        exe_path = filedialog.askopenfilename(
-            title=f"Selecione o executável para o Botão {self.button_key}", 
-            filetypes=[("Executáveis", "*.exe"), ("Todos", "*.*")]
-        )
-        if not exe_path:
-            return
-
-        self.action_type.set('open_program')
-        self.payload_box.delete('0.0', 'end')
-        self.payload_box.insert('0.0', exe_path)
-
-        basename = os.path.splitext(os.path.basename(exe_path))[0]
-        safe_makedirs(ICON_FOLDER)
-        out_png = os.path.join(ICON_FOLDER, f"btn{self.button_key}_{basename}.png")
-        extracted = self.icon_loader.extract_icon_to_png(exe_path, out_png, size=128)
-        
-        if extracted:
-            self.icon_path = extracted
-            self.conf['icon'] = self.icon_path
-            self.conf['action'] = {'type': 'open_program', 'payload': exe_path}
-            try:
-                self.parent.config.save()
-            except Exception:
-                pass
-            self._refresh_icon_preview()
-            messagebox.showinfo("Ícone extraído", f"Ícone extraído e salvo em:\n{extracted}")
-        else:
-            self.conf['action'] = {'type': 'open_program', 'payload': exe_path}
-            try:
-                self.parent.config.save()
-            except Exception:
-                pass
-            messagebox.showwarning("Extração falhou", "Não foi possível extrair o ícone do executável.")
-
-    def _choose_icon(self):
-        path = filedialog.askopenfilename(
-            title='Escolher ícone', 
-            filetypes=[('Images', '*.png *.jpg *.ico'), ('All', '*.*')]
-        )
-        if not path:
-            return
-        self.icon_path = path
-        self.conf['icon'] = self.icon_path
-        try:
-            self.parent.config.save()
-        except Exception:
-            pass
-        self._refresh_icon_preview()
-
-    def _refresh_icon_preview(self):
-        """Update icon preview display"""
-        ctk_img = self.icon_loader.load_icon_from_path(self.icon_path) if self.icon_path else None
-        
-        if ctk_img:
-            self.icon_preview.configure(image=ctk_img, text='')
-            self.icon_preview.image = ctk_img  # Manter referência
-        else:
-            self.icon_preview.configure(image='', text='📱')
-            self.icon_preview.image = None  # Remover referência
-
-    def _save(self):
-        try:
-            raw = self.payload_box.get('0.0', 'end').strip()
-            try:
-                payload = json.loads(raw) if raw else ''
-            except Exception:
-                payload = raw
-
-            self.conf['label'] = self.label_var.get()
-            if 'icon' not in self.conf:
-                self.conf['icon'] = self.icon_path
-            self.conf['action'] = {'type': self.action_type.get(), 'payload': payload}
-            self.parent.config.save()
-            self.logger.info(f'Botão {self.button_key} salvo: {self.conf}')
-            self.destroy()
-        except Exception as e:
-            messagebox.showerror('Erro', str(e))
-
-    def _test_action(self):
-        raw = self.payload_box.get('0.0', 'end').strip()
-        try:
-            payload = json.loads(raw) if raw else ''
-        except Exception:
-            payload = raw
-        action = Action(self.action_type.get(), payload)
-        self.parent.action_manager.perform(action)
 
 # -----------------------------
 # Main

@@ -2,7 +2,7 @@
     "version": "1.0.0",
     "buttons": {
         "1": {
-            "label": "Botão 1",
+            "label": "Navegador",
             "icon": "icons\\btn1_chrome.png",
             "action": {
                 "type": "open_program",
@@ -67,7 +67,7 @@
         }
     },
     "serial": {
-        "port": "COM1",
+        "port": "COM3",
         "baud": 115200
     },
     "appearance": {
