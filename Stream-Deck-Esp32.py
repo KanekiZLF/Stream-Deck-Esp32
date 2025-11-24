@@ -264,6 +264,15 @@ class IconLoader:
         self.cache: Dict[str, ctk.CTkImage] = {}
         self.icon_size = icon_size
 
+    def clear_cache_for_path(self, path: str):
+        """Remove um ícone específico do cache"""
+        if path in self.cache:
+            del self.cache[path]
+    
+    def clear_all_cache(self):
+        """Limpa todo o cache de ícones"""
+        self.cache.clear()
+
     def load_icon_from_path(self, path: str) -> Optional[ctk.CTkImage]:
         if not path or not os.path.exists(path):
             return None
@@ -786,22 +795,65 @@ class ButtonConfigDialog(ctk.CTkToplevel):
 
     def _on_delete(self):
         if messagebox.askyesno("Excluir", "Deseja remover o programa e o ícone deste botão?"):
-            # Apagar arquivo do ícone se existir
-            if self.conf.get('icon') and os.path.exists(self.conf['icon']):
-                try: os.remove(self.conf['icon'])
-                except: pass
+            try:
+                # 1. Captura o caminho do ícone antigo
+                file_to_delete = self.conf.get('icon', '')
                 
-            self.icon_path = ""
-            self.conf['action'] = {'type': 'none', 'payload': ''}
-            self.conf['icon'] = ""
-            self.conf['label'] = f"Botão {self.button_key}"
-            
-            # Forçar atualização direta na config pai
-            self.parent.config.data['buttons'][self.button_key] = self.conf
-            self.parent.config.save()
-            self.parent.logger.info(f"Configuração do Botão {self.button_key} removida.")
-            self.destroy()
+                # 2. Limpa completamente a configuração do botão
+                self.parent.config.data['buttons'][self.button_key] = {
+                    "label": f"Botão {self.button_key}",
+                    "icon": "",
+                    "action": {"type": "none", "payload": ""}
+                }
+                
+                # 3. Salva imediatamente
+                self.parent.config.save()
 
+                # 1. Limpa todo o cache de ícones
+                self.icon_loader.clear_all_cache()
+
+                # 2. Limpa a referência interna
+                self.icon_path = ""
+                self.conf['icon'] = ""
+
+                # 3. Limpa imediatamente o ícone do botão na GUI
+                try:
+                    btn = self.parent.button_frames[self.button_key]
+                    btn['icon_label'].configure(image=None, text='📱')
+                    btn['icon_label'].image = None
+                except:
+                    pass
+
+                # 4. Atualiza a interface
+                self.parent.refresh_all_buttons()
+                
+                # 4. Limpa o cache do icon_loader
+                if file_to_delete:
+                    self.icon_loader.clear_cache_for_path(file_to_delete)
+                    
+                    # Limpa também referências no PIL Image (opcional, para casos persistentes)
+                    try:
+                        import gc
+                        for obj in gc.get_objects():
+                            if isinstance(obj, Image.Image):
+                                try:
+                                    if hasattr(obj, 'filename') and obj.filename == file_to_delete:
+                                        obj.close()
+                                except:
+                                    pass
+                    except:
+                        pass
+                
+                # 5. Força uma atualização completa da interface
+                self.parent.refresh_all_buttons()
+
+                # 6. Fecha a janela
+                self.destroy()
+                
+            except Exception as e:
+                self.parent.logger.error(f"❌ Erro durante exclusão: {e}")
+                messagebox.showerror("Erro", f"Ocorreu um erro durante a exclusão: {e}")
+                
     def _save_and_close(self):
         raw = self.payload_entry.get().strip()
         payload = raw
@@ -1440,14 +1492,40 @@ class Esp32DeckApp(ctk.CTk):
         
     def refresh_all_buttons(self):
         for key, widget_map in self.button_frames.items():
+            # Pega a configuração atualizada
             btn_conf = self.config.data.get('buttons', {}).get(key, {})
-            widget_map['title_label'].configure(text=btn_conf.get('label', f'Botão {key}'))
+            
+            # Atualiza o Texto
+            new_label = btn_conf.get('label', f'Botão {key}')
+            widget_map['title_label'].configure(text=new_label)
+            
+            # Atualiza o Ícone
             icon_path = btn_conf.get('icon', '')
-            ctk_img = self.icon_loader.load_icon_from_path(icon_path) if icon_path else None
-            if not ctk_img and icon_path and icon_path.lower().endswith('.exe'):
-                ctk_img = self.icon_loader.try_load_windows_exe_icon(icon_path)
-            if ctk_img: widget_map['icon_label'].configure(image=ctk_img, text='')
-            else: widget_map['icon_label'].configure(image=None, text='📱')
+            
+            # Se não há ícone definido, garante que fique vazio
+            if not icon_path:
+                widget_map['icon_label'].configure(image=None, text='📱')
+                widget_map['icon_label'].image = None  # Importante: remove referência
+                continue
+                
+            # Tenta carregar a imagem
+            ctk_img = None
+            if icon_path and os.path.exists(icon_path):
+                ctk_img = self.icon_loader.load_icon_from_path(icon_path)
+                if not ctk_img and icon_path.lower().endswith('.exe'):
+                    ctk_img = self.icon_loader.try_load_windows_exe_icon(icon_path)
+
+            # Aplica no Widget
+            if ctk_img:
+                widget_map['icon_label'].configure(image=ctk_img, text='')
+                widget_map['icon_label'].image = ctk_img  # Mantém referência
+            else:
+                # Limpa completamente o ícone
+                widget_map['icon_label'].configure(image=None, text='📱')
+                widget_map['icon_label'].image = None
+                
+            # Força atualização visual
+            widget_map['icon_label'].update_idletasks()
 
     def open_button_config(self, button_key: str):
         if 'buttons' not in self.config.data:

@@ -1,100 +1,440 @@
 
---- Starting session Sun Nov 23 22:58:37 2025 ---
+--- Starting session Sun Nov 23 23:38:51 2025 ---
+[2025-11-23 23:38:59] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: CONNECTED
+[2025-11-23 23:38:59] [DEBUG] 📨 Recebido serial: 🎉 STATUS: Conectado ao software Python
+[2025-11-23 23:38:59] [DEBUG] 📨 Recebido serial: ✅ Conexão estabelecida com software
+[2025-11-23 23:39:57] [INFO] 🚪 Fechando aplicação...
+[2025-11-23 23:39:57] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: DISCONNECT
+[2025-11-23 23:39:58] [INFO] 🔌 Porta serial fechada
+[2025-11-23 23:39:58] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 22:59:37 2025 ---
-[2025-11-23 22:59:52] [INFO] 🚪 Fechando aplicação...
-[2025-11-23 22:59:53] [INFO] 🚪 Fechando aplicação...
+--- Starting session Sun Nov 23 23:40:01 2025 ---
+[2025-11-23 23:41:39] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: CONNECTED
+[2025-11-23 23:41:39] [DEBUG] 📨 Recebido serial: 🎉 STATUS: Conectado ao software Python
+[2025-11-23 23:41:39] [DEBUG] 📨 Recebido serial: ✅ Conexão estabelecida com software
+[2025-11-23 23:41:50] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:41:50] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:41:50] [DEBUG] Executando ação: open_program
+[2025-11-23 23:41:55] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:41:55] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:41:55] [DEBUG] Executando ação: open_program
+[2025-11-23 23:41:56] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:41:56] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:41:56] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:06] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:42:06] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:42:06] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:11] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:42:11] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:42:11] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:13] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:42:13] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:42:13] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:14] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:42:14] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:42:14] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:15] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:42:15] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:42:15] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:16] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:42:16] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:42:16] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:17] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:42:17] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:42:17] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:18] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:42:18] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:42:18] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:18] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:42:18] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:42:18] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:19] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:42:19] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:42:19] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:20] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:42:20] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:42:20] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:20] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:42:20] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:42:20] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:21] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:42:21] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:42:21] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:22] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:42:22] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:42:22] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:23] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:42:23] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:42:23] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:23] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:42:23] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:42:23] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:24] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:42:24] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:42:24] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:24] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:42:24] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:42:24] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:26] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:42:26] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:42:26] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:27] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:42:27] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:42:28] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:28] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:42:28] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:42:28] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:31] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:42:31] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:42:31] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:46] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-23 23:42:46] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-23 23:42:46] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:50] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:42:50] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:42:50] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:52] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:42:52] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:42:52] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:53] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-23 23:42:53] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-23 23:42:53] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:54] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-23 23:42:54] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-23 23:42:54] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:54] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:42:54] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:42:54] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:55] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:42:55] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:42:55] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:56] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:42:56] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:42:56] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:57] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:42:57] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:42:57] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:57] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-23 23:42:57] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-23 23:42:57] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:58] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-23 23:42:58] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-23 23:42:58] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:58] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:42:58] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:42:58] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:59] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:42:59] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:42:59] [DEBUG] Executando ação: open_program
+[2025-11-23 23:42:59] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:42:59] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:42:59] [DEBUG] Executando ação: open_program
+[2025-11-23 23:43:00] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:43:00] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:43:00] [DEBUG] Executando ação: open_program
+[2025-11-23 23:43:00] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-23 23:43:00] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-23 23:43:00] [DEBUG] Executando ação: open_program
+[2025-11-23 23:43:01] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-23 23:43:01] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-23 23:43:01] [DEBUG] Executando ação: open_program
+[2025-11-23 23:43:01] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:43:01] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:43:01] [DEBUG] Executando ação: open_program
+[2025-11-23 23:43:02] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:43:02] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:43:02] [DEBUG] Executando ação: open_program
+[2025-11-23 23:45:27] [DEBUG] 📨 Recebido serial: ets Jul 29 2019 12:21:46
+[2025-11-23 23:45:27] [DEBUG] 📨 Recebido serial: rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+[2025-11-23 23:45:27] [DEBUG] 📨 Recebido serial: configsip: 0, SPIWP:0xee
+[2025-11-23 23:45:27] [DEBUG] 📨 Recebido serial: clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+[2025-11-23 23:45:27] [DEBUG] 📨 Recebido serial: mode:DIO, clock div:1
+[2025-11-23 23:45:27] [DEBUG] 📨 Recebido serial: load:0x3fff0030,len:4980
+[2025-11-23 23:45:27] [DEBUG] 📨 Recebido serial: load:0x40078000,len:16612
+[2025-11-23 23:45:27] [DEBUG] 📨 Recebido serial: load:0x40080400,len:3480
+[2025-11-23 23:45:27] [DEBUG] 📨 Recebido serial: entry 0x400805b4
+[2025-11-23 23:45:31] [DEBUG] 📨 Recebido serial: 💤 STATUS: Desconectado - aguardando software
+[2025-11-23 23:45:32] [DEBUG] 📨 Recebido serial: 🎮 Esp32 DECK INICIADO
+[2025-11-23 23:45:32] [DEBUG] 📨 Recebido serial: 📡 Aguardando conexão...
+[2025-11-23 23:45:32] [DEBUG] 📨 Recebido serial: ✅ Firmware: v2.4 - Multi Interface
+[2025-11-23 23:45:32] [DEBUG] 📨 Recebido serial: 👨‍💻 Desenvolvedor: Luiz F. R. Pimentel
+[2025-11-23 23:46:24] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: DISCONNECT
+[2025-11-23 23:46:24] [INFO] 🔌 Porta serial fechada
+[2025-11-23 23:46:31] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: CONNECTED
+[2025-11-23 23:46:31] [DEBUG] 📨 Recebido serial: 🎉 STATUS: Conectado ao software Python
+[2025-11-23 23:46:31] [DEBUG] 📨 Recebido serial: ✅ Conexão estabelecida com software
+[2025-11-23 23:46:37] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:46:37] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:46:37] [DEBUG] Executando ação: open_program
+[2025-11-23 23:46:38] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:46:38] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:46:38] [DEBUG] Executando ação: open_program
+[2025-11-23 23:46:38] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-23 23:46:38] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-23 23:46:38] [DEBUG] Executando ação: open_program
+[2025-11-23 23:46:39] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-23 23:46:39] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-23 23:46:39] [DEBUG] Executando ação: open_program
+[2025-11-23 23:46:39] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:46:39] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:46:39] [DEBUG] Executando ação: open_program
+[2025-11-23 23:46:39] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:46:40] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:46:40] [DEBUG] Executando ação: open_program
+[2025-11-23 23:46:51] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:46:51] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:46:51] [DEBUG] Executando ação: open_program
+[2025-11-23 23:46:51] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:46:51] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:46:51] [DEBUG] Executando ação: open_program
+[2025-11-23 23:46:52] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-23 23:46:52] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-23 23:46:52] [DEBUG] Executando ação: open_program
+[2025-11-23 23:46:53] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-23 23:46:53] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-23 23:46:53] [DEBUG] Executando ação: open_program
+[2025-11-23 23:46:53] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:46:53] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:46:53] [DEBUG] Executando ação: open_program
+[2025-11-23 23:46:54] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:46:54] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:46:54] [DEBUG] Executando ação: open_program
+[2025-11-23 23:46:56] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:46:56] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:46:56] [DEBUG] Executando ação: open_program
+[2025-11-23 23:46:57] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-23 23:46:57] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-23 23:46:57] [DEBUG] Executando ação: open_program
+[2025-11-23 23:46:57] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:46:57] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:46:57] [DEBUG] Executando ação: open_program
+[2025-11-23 23:46:59] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:46:59] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:46:59] [DEBUG] Executando ação: open_program
+[2025-11-23 23:46:59] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:46:59] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:46:59] [DEBUG] Executando ação: open_program
+[2025-11-23 23:47:00] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-23 23:47:00] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-23 23:47:00] [DEBUG] Executando ação: open_program
+[2025-11-23 23:47:00] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-23 23:47:00] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-23 23:47:00] [DEBUG] Executando ação: open_program
+[2025-11-23 23:47:01] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:47:01] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:47:01] [DEBUG] Executando ação: open_program
+[2025-11-23 23:47:01] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:47:01] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:47:01] [DEBUG] Executando ação: open_program
+[2025-11-23 23:47:02] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:47:02] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:47:02] [DEBUG] Executando ação: open_program
+[2025-11-23 23:47:02] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:47:02] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:47:02] [DEBUG] Executando ação: open_program
+[2025-11-23 23:47:03] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-23 23:47:03] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-23 23:47:03] [DEBUG] Executando ação: open_program
+[2025-11-23 23:47:04] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-23 23:47:04] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-23 23:47:04] [DEBUG] Executando ação: open_program
+[2025-11-23 23:47:04] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-23 23:47:04] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-23 23:47:04] [DEBUG] Executando ação: open_program
+[2025-11-23 23:47:05] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-23 23:47:05] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-23 23:47:05] [DEBUG] Executando ação: open_program
+[2025-11-23 23:47:26] [INFO] 🚪 Fechando aplicação...
+[2025-11-23 23:47:26] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: DISCONNECT
+[2025-11-23 23:47:27] [INFO] 🔌 Porta serial fechada
+[2025-11-23 23:47:27] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:01:23 2025 ---
-[2025-11-23 23:01:42] [INFO] 🚪 Fechando aplicação...
-[2025-11-23 23:01:43] [INFO] 🚪 Fechando aplicação...
+--- Starting session Sun Nov 23 23:51:04 2025 ---
+[2025-11-23 23:51:25] [INFO] 🚪 Fechando aplicação...
+[2025-11-23 23:51:25] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:03:18 2025 ---
-[2025-11-23 23:04:06] [INFO] 🚪 Fechando aplicação...
-[2025-11-23 23:04:06] [INFO] 🚪 Fechando aplicação...
+--- Starting session Sun Nov 23 23:52:48 2025 ---
+[2025-11-23 23:53:13] [INFO] 🚪 Fechando aplicação...
+[2025-11-23 23:53:13] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:12:39 2025 ---
-[2025-11-23 23:13:03] [INFO] 🚪 Fechando aplicação...
-[2025-11-23 23:13:04] [INFO] 🚪 Fechando aplicação...
+--- Starting session Sun Nov 23 23:55:37 2025 ---
+[2025-11-23 23:55:53] [INFO] 🚪 Fechando aplicação...
+[2025-11-23 23:55:53] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:13:45 2025 ---
-[2025-11-23 23:14:34] [INFO] 🚪 Fechando aplicação...
-[2025-11-23 23:14:34] [INFO] 🚪 Fechando aplicação...
+--- Starting session Mon Nov 24 00:00:05 2025 ---
+[2025-11-24 00:00:30] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:00:31] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:15:34 2025 ---
+--- Starting session Mon Nov 24 00:01:24 2025 ---
+[2025-11-24 00:01:40] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:01:40] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:16:40 2025 ---
-[2025-11-23 23:17:11] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: CONNECTED
-[2025-11-23 23:17:11] [DEBUG] 📨 Recebido serial: 🎉 STATUS: Conectado ao software Python
-[2025-11-23 23:17:11] [DEBUG] 📨 Recebido serial: ✅ Conexão estabelecida com software
-[2025-11-23 23:17:18] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: DISCONNECT
-[2025-11-23 23:17:18] [INFO] 🔌 Porta serial fechada
-[2025-11-23 23:17:20] [INFO] 🚪 Fechando aplicação...
-[2025-11-23 23:17:20] [INFO] 🚪 Fechando aplicação...
+--- Starting session Mon Nov 24 00:01:59 2025 ---
+[2025-11-24 00:02:15] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:02:16] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:18:44 2025 ---
-[2025-11-23 23:19:06] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: CONNECTED
-[2025-11-23 23:19:06] [DEBUG] 📨 Recebido serial: 🎉 STATUS: Conectado ao software Python
-[2025-11-23 23:19:06] [DEBUG] 📨 Recebido serial: ✅ Conexão estabelecida com software
-[2025-11-23 23:19:25] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: DISCONNECT
-[2025-11-23 23:19:26] [INFO] 🔌 Porta serial fechada
-[2025-11-23 23:19:38] [INFO] 🚪 Fechando aplicação...
-[2025-11-23 23:19:38] [INFO] 🚪 Fechando aplicação...
+--- Starting session Mon Nov 24 00:03:36 2025 ---
+[2025-11-24 00:04:07] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:04:07] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:19:56 2025 ---
-[2025-11-23 23:20:35] [INFO] 🚪 Fechando aplicação...
-[2025-11-23 23:20:35] [INFO] 🚪 Fechando aplicação...
+--- Starting session Mon Nov 24 00:05:22 2025 ---
+[2025-11-24 00:05:41] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:05:42] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:21:17 2025 ---
-[2025-11-23 23:24:25] [INFO] 🚪 Fechando aplicação...
-[2025-11-23 23:24:25] [INFO] 🚪 Fechando aplicação...
+--- Starting session Mon Nov 24 00:06:00 2025 ---
+[2025-11-24 00:06:11] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:06:11] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:24:27 2025 ---
-[2025-11-23 23:24:33] [INFO] 🚪 Fechando aplicação...
-[2025-11-23 23:24:34] [INFO] 🚪 Fechando aplicação...
+--- Starting session Mon Nov 24 00:08:17 2025 ---
+[2025-11-24 00:08:37] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:08:38] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:26:17 2025 ---
+--- Starting session Mon Nov 24 00:09:02 2025 ---
+[2025-11-24 00:09:27] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:09:28] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:26:53 2025 ---
-[2025-11-23 23:27:05] [INFO] 🚪 Fechando aplicação...
-[2025-11-23 23:27:05] [INFO] 🚪 Fechando aplicação...
+--- Starting session Mon Nov 24 00:11:26 2025 ---
+[2025-11-24 00:11:39] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:11:39] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:27:31 2025 ---
-[2025-11-23 23:27:36] [INFO] 🚪 Fechando aplicação...
-[2025-11-23 23:27:37] [INFO] 🚪 Fechando aplicação...
+--- Starting session Mon Nov 24 00:13:46 2025 ---
+[2025-11-24 00:14:00] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:14:00] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:28:04 2025 ---
-[2025-11-23 23:29:33] [INFO] 🚪 Fechando aplicação...
-[2025-11-23 23:29:33] [INFO] 🚪 Fechando aplicação...
+--- Starting session Mon Nov 24 00:19:05 2025 ---
+[2025-11-24 00:19:33] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:19:33] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:29:37 2025 ---
-[2025-11-23 23:30:22] [INFO] 🚪 Fechando aplicação...
-[2025-11-23 23:30:23] [INFO] 🚪 Fechando aplicação...
+--- Starting session Mon Nov 24 00:21:28 2025 ---
+[2025-11-24 00:21:54] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:21:54] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:30:26 2025 ---
+--- Starting session Mon Nov 24 00:23:38 2025 ---
+[2025-11-24 00:23:51] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:23:52] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:30:38 2025 ---
+--- Starting session Mon Nov 24 00:24:19 2025 ---
+[2025-11-24 00:24:34] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:24:34] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:30:56 2025 ---
-[2025-11-23 23:31:16] [INFO] 🚪 Fechando aplicação...
-[2025-11-23 23:31:16] [INFO] 🚪 Fechando aplicação...
+--- Starting session Mon Nov 24 00:25:29 2025 ---
+[2025-11-24 00:25:41] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:25:41] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:33:12 2025 ---
-[2025-11-23 23:33:36] [INFO] 🚪 Fechando aplicação...
-[2025-11-23 23:33:36] [INFO] 🚪 Fechando aplicação...
+--- Starting session Mon Nov 24 00:26:10 2025 ---
+[2025-11-24 00:26:24] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:26:24] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:33:53 2025 ---
-[2025-11-23 23:34:01] [INFO] 🚪 Fechando aplicação...
-[2025-11-23 23:34:01] [INFO] 🚪 Fechando aplicação...
+--- Starting session Mon Nov 24 00:27:02 2025 ---
+[2025-11-24 00:27:36] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:27:36] [INFO] 🚪 Fechando aplicação...
 
---- Starting session Sun Nov 23 23:34:50 2025 ---
-[2025-11-23 23:34:54] [ERROR] Falha na atualização: Muitas tentativas (429). Aguarde alguns minutos.
-[2025-11-23 23:35:28] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: CONNECTED
-[2025-11-23 23:35:29] [DEBUG] 📨 Recebido serial: 🎉 STATUS: Conectado ao software Python
-[2025-11-23 23:35:29] [DEBUG] 📨 Recebido serial: ✅ Conexão estabelecida com software
-[2025-11-23 23:36:03] [DEBUG] Executando ação: open_program
-[2025-11-23 23:36:03] [ERROR] Arquivo não encontrado: 
-[2025-11-23 23:36:15] [INFO] 🚪 Fechando aplicação...
-[2025-11-23 23:36:15] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: DISCONNECT
-[2025-11-23 23:36:16] [INFO] 🔌 Porta serial fechada
-[2025-11-23 23:36:16] [INFO] 🚪 Fechando aplicação...
+--- Starting session Mon Nov 24 00:29:00 2025 ---
+[2025-11-24 00:29:23] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:29:23] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:30:12 2025 ---
+[2025-11-24 00:30:50] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:30:50] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:32:47 2025 ---
+[2025-11-24 00:33:04] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:33:04] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:33:31 2025 ---
+[2025-11-24 00:33:46] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:33:46] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:34:55 2025 ---
+[2025-11-24 00:35:11] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:35:12] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:35:28 2025 ---
+[2025-11-24 00:35:41] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:35:41] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:37:49 2025 ---
+[2025-11-24 00:38:03] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:38:03] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:38:24 2025 ---
+[2025-11-24 00:40:03] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:40:03] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:40:06 2025 ---
+[2025-11-24 00:40:20] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:40:20] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:40:26 2025 ---
+[2025-11-24 00:40:38] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:40:38] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:40:47 2025 ---
+[2025-11-24 00:40:58] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:40:59] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:41:24 2025 ---
+[2025-11-24 00:41:36] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:41:36] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:41:50 2025 ---
+[2025-11-24 00:41:54] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:41:54] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:42:01 2025 ---
+[2025-11-24 00:42:15] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:42:16] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:42:23 2025 ---
+[2025-11-24 00:42:34] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:42:34] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:42:42 2025 ---
+[2025-11-24 00:42:52] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:42:52] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:43:00 2025 ---
+[2025-11-24 00:43:26] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:43:26] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:46:38 2025 ---
+
+--- Starting session Mon Nov 24 00:48:15 2025 ---
+[2025-11-24 00:48:26] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:48:27] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:49:00 2025 ---
+[2025-11-24 00:49:16] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:49:16] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:51:05 2025 ---
+[2025-11-24 00:51:34] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:51:34] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:53:09 2025 ---
+[2025-11-24 00:53:29] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:53:29] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:53:54 2025 ---
+[2025-11-24 00:54:02] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:54:02] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:54:19 2025 ---
+[2025-11-24 00:54:29] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:54:29] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:55:06 2025 ---
+[2025-11-24 00:55:15] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:55:15] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:56:05 2025 ---
+[2025-11-24 00:56:21] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:56:21] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:57:11 2025 ---
+[2025-11-24 00:57:40] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:57:41] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 00:59:16 2025 ---
+[2025-11-24 00:59:35] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 00:59:35] [INFO] 🚪 Fechando aplicação...
