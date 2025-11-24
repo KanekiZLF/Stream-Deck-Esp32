@@ -79,6 +79,6 @@
         "icon_size": 64
     },
     "update": {
-        "check_url": "https://raw.githubusercontent.com/KanekiZLF/PrismaFX---Gerador-ImageFX-em-Lote/master/version.txt"
+        "check_url": "https://raw.githubusercontent.com/KanekiZLF/Stream-Deck-Esp32/refs/heads/main/version.txt"
     }
 }
