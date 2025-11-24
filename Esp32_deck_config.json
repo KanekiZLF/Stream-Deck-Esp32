@@ -3,10 +3,10 @@
     "buttons": {
         "1": {
             "label": "Botão 1",
-            "icon": "",
+            "icon": "icons\\btn1_chrome.png",
             "action": {
-                "type": "none",
-                "payload": ""
+                "type": "open_program",
+                "payload": "C:/Program Files/Google/Chrome/Application/chrome.exe"
             }
         },
         "2": {
@@ -75,9 +75,10 @@
         "transparency": 1.0,
         "color_scheme": "Moderno",
         "font_size": "Médio",
-        "minimize_to_tray": false
+        "minimize_to_tray": false,
+        "icon_size": 64
     },
     "update": {
-        "check_url": "https://raw.githubusercontent.com/yourrepo/streamdeck/main/version.json"
+        "check_url": "https://raw.githubusercontent.com/KanekiZLF/StreamDeck-ESP32/main/update_info.json"
     }
 }

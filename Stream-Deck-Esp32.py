@@ -14,10 +14,14 @@ from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, Callable, List
 
 # Windows API
-import win32gui
-import win32con
-import win32process
-
+try:
+    import win32gui
+    import win32con
+    import win32process
+    WINDOWS_AVAILABLE = platform.system() == 'Windows'
+except ImportError:
+    WINDOWS_AVAILABLE = False
+    
 # GUI libs
 import customtkinter as ctk
 import tkinter as tk
@@ -62,7 +66,7 @@ except ImportError:
 CONFIG_FILE = "Esp32_deck_config.json"
 ICON_FOLDER = "icons"
 LOG_FILE = "Esp32_deck.log"
-APP_VERSION = "1.5.6" # Versão: Filtro de Log Otimizado
+APP_VERSION = "1.5.11" # Versão: Correção Final via Recriação de Widget (Destroy/Recreate)
 APP_NAME = "Esp32 Deck Controller"
 APP_ICON_NAME = "app_icon.ico"
 DEVELOPER = "Luiz F. R. Pimentel"
@@ -112,7 +116,6 @@ class Logger:
     def __init__(self, textbox: Optional[ctk.CTkTextbox] = None, file_path: Optional[str] = LOG_FILE):
         self.textbox = textbox
         self.file_path = file_path
-        # Inicialização sempre grava no arquivo
         if file_path:
             try:
                 with open(file_path, 'a', encoding='utf-8') as f:
@@ -133,26 +136,17 @@ class Logger:
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         entry = f"[{timestamp}] [{level}] {msg}"
         
-        # 1. Sempre mostrar no Console
         print(entry)
         
-        # 2. Lógica de Filtro para o Arquivo de Log
-        # Salva apenas se for ERRO ou mensagens críticas de ciclo de vida
         should_save = False
         if level == "ERROR":
             should_save = True
-        elif "Fechando aplicação" in msg:
-            should_save = True
-        elif "Porta serial fechada" in msg:
+        elif "Fechando aplicação" in msg or "Porta serial fechada" in msg:
             should_save = True
         
-        if should_save:
-            self._write_file(entry)
-
-        if level == "DEBUG":
+        if should_save or level == "DEBUG":
             self._write_file(entry)
             
-        # 3. GUI sempre recebe tudo (Visualização em tempo real)
         if self.textbox:
             try:
                 self.textbox.configure(state="normal")
@@ -270,8 +264,22 @@ class IconLoader:
             del self.cache[path]
     
     def clear_all_cache(self):
-        """Limpa todo o cache de ícones"""
+        """
+        Limpa todo o cache de ícones e tenta liberar memória PIL/Pillow.
+        """
         self.cache.clear()
+        try:
+            import gc
+            gc.collect() 
+            for obj in gc.get_objects():
+                if isinstance(obj, Image.Image):
+                    try:
+                        obj.close() 
+                    except:
+                        pass
+            gc.collect()
+        except Exception:
+            pass
 
     def load_icon_from_path(self, path: str) -> Optional[ctk.CTkImage]:
         if not path or not os.path.exists(path):
@@ -295,31 +303,37 @@ class IconLoader:
         return None
 
     def extract_icon_to_png(self, exe_path: str, out_png_path: str, size: int = 256) -> Optional[str]:
+        if not WINDOWS_AVAILABLE: return None
         try:
-            import win32api
             import win32ui # type: ignore
             large, small = win32gui.ExtractIconEx(exe_path, 0)
-            hicon = None
-            if large and len(large) > 0: hicon = large[0]
-            elif small and len(small) > 0: hicon = small[0]
-            else: return None
+            hicon = large[0] if large and len(large) > 0 else small[0] if small and len(small) > 0 else None
+            
+            if not hicon: return None
 
             hdc = win32ui.CreateDCFromHandle(win32gui.GetDC(0))
             hbmp = win32ui.CreateBitmap()
             hbmp.CreateCompatibleBitmap(hdc, size, size)
             hdc_mem = hdc.CreateCompatibleDC()
             hdc_mem.SelectObject(hbmp)
+            
             win32gui.DrawIconEx(hdc_mem.GetSafeHdc(), 0, 0, hicon, size, size, 0, None, win32con.DI_NORMAL)
+            
             temp_bmp = out_png_path + ".bmp"
             hbmp.SaveBitmapFile(hdc_mem, temp_bmp)
+            
             img = Image.open(temp_bmp).convert("RGBA")
             img = img.resize((size, size), Image.LANCZOS)
             img.save(out_png_path, "PNG")
+            
             try: os.remove(temp_bmp)
             except Exception: pass
+            
             try: 
                 for h in large: win32gui.DestroyIcon(h)
+                for h in small: win32gui.DestroyIcon(h)
             except Exception: pass
+            
             return out_png_path
         except Exception:
             return None
@@ -369,7 +383,6 @@ class TrayIconManager:
             self.logger.warn("Biblioteca 'pystray' não instalada. Tray icon desativado.")
             return
 
-        # Carrega o ícone (do arquivo ou fallback)
         image = self.load_tray_icon()
         
         menu = (item('Abrir Esp32Deck', self.on_open_click, default=True), item('Sair', self.on_exit_click))
@@ -391,6 +404,7 @@ class WindowManager:
         self.logger = logger
         
     def get_hwnds_for_pid(self, pid: int) -> List[int]:
+        if not WINDOWS_AVAILABLE: return []
         def callback(hwnd, hwnds):
             if win32gui.IsWindowVisible(hwnd) and win32gui.IsWindowEnabled(hwnd):
                 _, found_pid = win32process.GetWindowThreadProcessId(hwnd)
@@ -402,8 +416,8 @@ class WindowManager:
         return hwnds
 
     def toggle_application(self, exe_path: str):
-        if not PSUTIL_AVAILABLE:
-            self.logger.warn("Biblioteca 'psutil' não encontrada. Instalando apenas nova instância.")
+        if not PSUTIL_AVAILABLE or not WINDOWS_AVAILABLE:
+            self.logger.warn(f"Dependência não disponível. Iniciando {os.path.basename(exe_path)}")
             self._start_new(exe_path)
             return
 
@@ -444,6 +458,7 @@ class WindowManager:
                 self._bring_to_front(target_hwnds[0])
 
     def _bring_to_front(self, hwnd):
+        if not WINDOWS_AVAILABLE: return
         try:
             if win32gui.GetForegroundWindow() == hwnd: return
             if win32gui.IsIconic(hwnd): win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
@@ -459,7 +474,10 @@ class WindowManager:
 
     def _start_new(self, path):
         if os.path.exists(path):
-            os.startfile(path) if sys.platform.startswith('win') else subprocess.Popen([path])
+            if sys.platform.startswith('win'):
+                os.startfile(path)
+            else:
+                subprocess.Popen([path])
         else:
             self.logger.error(f'Arquivo não encontrado: {path}')
 
@@ -587,6 +605,7 @@ class SerialManager:
             self._running = False
             self._is_connected = False
             if self.on_status_change: self.on_status_change(False)
+            self.logger.warn("Loop de leitura serial interrompido.")
 
 # -----------------------------
 # Update Checker
@@ -658,6 +677,7 @@ class AboutDialog(ctk.CTkToplevel):
         self.grab_set()
         self._center_window()
         self._build_ui()
+        self.protocol("WM_DELETE_WINDOW", self.destroy)
 
     def _center_window(self):
         self.update_idletasks()
@@ -709,15 +729,18 @@ class ButtonConfigDialog(ctk.CTkToplevel):
         self.transient(parent)
         self.grab_set()
         self._center_window()
+        self.protocol("WM_DELETE_WINDOW", self._on_cancel)
         self.label_var = tk.StringVar(value=self.conf.get('label', f'Botão {button_key}'))
         self.icon_path = self.conf.get('icon', '')
         self._initial_payload = self.conf.get('action', {}).get('payload', '')
         self._build()
+        
     def _center_window(self):
         self.update_idletasks()
         x = (self.winfo_screenwidth() // 2) - (self.winfo_width() // 2)
         y = (self.winfo_screenheight() // 2) - (self.winfo_height() // 2)
         self.geometry(f'+{x}+{y}')
+        
     def _build(self):
         main_frame = ctk.CTkFrame(self, corner_radius=10)
         main_frame.pack(fill='both', expand=True, padx=15, pady=15)
@@ -728,7 +751,7 @@ class ButtonConfigDialog(ctk.CTkToplevel):
         ctk.CTkEntry(main_frame, textvariable=self.label_var, width=400, placeholder_text="Máximo 16 caracteres").pack(fill='x', pady=5)
         icon_frame = ctk.CTkFrame(main_frame, corner_radius=8)
         icon_frame.pack(fill='x', pady=10)
-        ctk.CTkLabel(icon_frame, text='Programa:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', padx=10, pady=10)
+        ctk.CTkLabel(icon_frame, text='Ícone e Programa:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', padx=10, pady=10)
         icon_content = ctk.CTkFrame(icon_frame, fg_color="transparent")
         icon_content.pack(fill='x', padx=10, pady=5)
         self.icon_preview = ctk.CTkLabel(icon_content, text='📱', width=64, height=64, font=ctk.CTkFont(size=20), text_color=COLORS["primary"])
@@ -739,7 +762,7 @@ class ButtonConfigDialog(ctk.CTkToplevel):
         ctk.CTkButton(btn_frame, text='Selecionar Programa', width=140, command=self._select_program_for_button).pack(side='left', padx=5)
         payload_frame = ctk.CTkFrame(main_frame, corner_radius=8)
         payload_frame.pack(fill='x', pady=10)
-        ctk.CTkLabel(payload_frame, text='Caminho:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', padx=10, pady=(10, 5))
+        ctk.CTkLabel(payload_frame, text='Comando / Caminho:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', padx=10, pady=(10, 5))
         self.payload_entry = ctk.CTkEntry(payload_frame, height=35)
         self.payload_entry.pack(fill='x', padx=10, pady=(0, 10))
         try:
@@ -776,6 +799,7 @@ class ButtonConfigDialog(ctk.CTkToplevel):
     def _choose_icon(self):
         path = filedialog.askopenfilename(filetypes=[('Images', '*.png *.jpg *.ico'), ('All', '*.*')])
         if not path: return
+        self._newly_created_icon = None
         self.icon_path = path
         self.conf['icon'] = self.icon_path
         self._refresh_icon_preview()
@@ -784,90 +808,95 @@ class ButtonConfigDialog(ctk.CTkToplevel):
         ctk_img = self.icon_loader.load_icon_from_path(self.icon_path) if self.icon_path else None
         if ctk_img:
             self.icon_preview.configure(image=ctk_img, text='')
+            self.icon_preview.image = ctk_img 
         else:
             self.icon_preview.configure(image=None, text='📱')
+            self.icon_preview.image = None
 
     def _on_cancel(self):
         if self._newly_created_icon and os.path.exists(self._newly_created_icon):
-            try: os.remove(self._newly_created_icon)
-            except: pass
+            try: 
+                os.remove(self._newly_created_icon)
+                self.logger.info(f"Ícone extraído temporário removido: {self._newly_created_icon}")
+            except: 
+                pass
         self.destroy()
 
     def _on_delete(self):
-        if messagebox.askyesno("Excluir", "Deseja remover o programa e o ícone deste botão?"):
-            try:
-                # 1. Captura o caminho do ícone antigo
-                file_to_delete = self.conf.get('icon', '')
-                
-                # 2. Limpa completamente a configuração do botão
-                self.parent.config.data['buttons'][self.button_key] = {
-                    "label": f"Botão {self.button_key}",
-                    "icon": "",
-                    "action": {"type": "none", "payload": ""}
-                }
-                
-                # 3. Salva imediatamente
-                self.parent.config.save()
+        """
+        Garante a remoção da referência da imagem e recria o IconLoader para liberar memória.
+        A limpeza visual acontece no refresh_all_buttons recriando o Frame do botão.
+        """
+        if not messagebox.askyesno("Excluir", "Deseja remover o programa e o ícone deste botão?"):
+            return
 
-                # 1. Limpa todo o cache de ícones
-                self.icon_loader.clear_all_cache()
+        try:
+            file_to_delete = self.conf.get('icon', '')
+            
+            # 1. Limpa a configuração do botão no ConfigManager
+            self.parent.config.data['buttons'][self.button_key] = {
+                "label": f"Botão {self.button_key}",
+                "icon": "",
+                "action": {"type": "none", "payload": ""}
+            }
+            
+            # 2. Reinicia o loader e Recria a tela para garantir a limpeza do fantasma.
+            self.parent._reset_icon_loader()
+            
+            # 3. Limpa a referência interna do diálogo e salva
+            self.icon_path = ""
+            self.conf['icon'] = ""
+            self.parent.config.save()
 
-                # 2. Limpa a referência interna
-                self.icon_path = ""
-                self.conf['icon'] = ""
-
-                # 3. Limpa imediatamente o ícone do botão na GUI
-                try:
-                    btn = self.parent.button_frames[self.button_key]
-                    btn['icon_label'].configure(image=None, text='📱')
-                    btn['icon_label'].image = None
-                except:
+            # 4. Atualiza a interface
+            self.parent.refresh_all_buttons()
+            
+            # 5. Tenta deletar o arquivo de ícone extraído/temporário
+            if self._newly_created_icon and os.path.exists(self._newly_created_icon):
+                try: 
+                    os.remove(self._newly_created_icon)
+                    self.parent.logger.info(f"Ícone extraído removido: {self._newly_created_icon}")
+                except Exception:
                     pass
 
-                # 4. Atualiza a interface
-                self.parent.refresh_all_buttons()
-                
-                # 4. Limpa o cache do icon_loader
-                if file_to_delete:
-                    self.icon_loader.clear_cache_for_path(file_to_delete)
-                    
-                    # Limpa também referências no PIL Image (opcional, para casos persistentes)
-                    try:
-                        import gc
-                        for obj in gc.get_objects():
-                            if isinstance(obj, Image.Image):
-                                try:
-                                    if hasattr(obj, 'filename') and obj.filename == file_to_delete:
-                                        obj.close()
-                                except:
-                                    pass
-                    except:
-                        pass
-                
-                # 5. Força uma atualização completa da interface
-                self.parent.refresh_all_buttons()
-
-                # 6. Fecha a janela
-                self.destroy()
-                
-            except Exception as e:
-                self.parent.logger.error(f"❌ Erro durante exclusão: {e}")
-                messagebox.showerror("Erro", f"Ocorreu um erro durante a exclusão: {e}")
+            self.destroy()
+            
+        except Exception as e:
+            self.parent.logger.error(f"❌ Erro durante exclusão: {e}\n{traceback.format_exc()}")
+            messagebox.showerror("Erro", f"Ocorreu um erro durante a exclusão: {e}")
                 
     def _save_and_close(self):
         raw = self.payload_entry.get().strip()
         payload = raw
-        try: payload = json.loads(raw) if raw else ''
-        except: pass
+        try: 
+            payload = json.loads(raw) if raw else ''
+        except: 
+            pass
+            
         self.conf['label'] = self.label_var.get()
-        if 'icon' not in self.conf: self.conf['icon'] = self.icon_path
-        self.conf['action'] = {'type': 'open_program', 'payload': payload}
+        self.conf['icon'] = self.icon_path
+        
+        action_type = self.conf.get('action', {}).get('type', 'open_program')
+        if action_type == 'none' and payload:
+            action_type = 'open_program' 
+
+        self.conf['action'] = {'type': action_type, 'payload': payload}
+        self.parent.config.data['buttons'][self.button_key] = self.conf
         self.parent.config.save()
+        
+        # REINICIA O LOADER e atualiza
+        self.parent._reset_icon_loader()
+        self.parent.refresh_all_buttons()
+        
         self.destroy()
 
     def _test_action(self):
         raw = self.payload_entry.get().strip()
-        self.parent.action_manager.perform(Action('open_program', raw))
+        inferred_type = 'open_program'
+        if raw.lower().startswith('http'):
+             inferred_type = 'open_url'
+        
+        self.parent.action_manager.perform(Action(inferred_type, raw))
 
 # -----------------------------
 # GUI / App
@@ -878,12 +907,18 @@ class Esp32DeckApp(ctk.CTk):
         self.title(f'{APP_NAME} v{APP_VERSION}')
         self.geometry('900x700')
         self.resizable(False, False)
+        
         self._setup_app_icon()
         self._setup_theme()
         
         self.config = ConfigManager()
-        self.icon_loader = IconLoader(icon_size=(self.config.data.get('appearance', {}).get('icon_size', ICON_SIZE[0]),) * 2)
-        self.logger = Logger(file_path=LOG_FILE)
+        
+        # 1. Inicializa o Logger
+        self.logger = Logger(file_path=LOG_FILE) 
+        
+        # 2. Inicializa o IconLoader
+        self._reset_icon_loader()
+        
         self.action_manager = ActionManager(self.logger)
         
         self.serial_manager = SerialManager(
@@ -894,9 +929,9 @@ class Esp32DeckApp(ctk.CTk):
         )
         self.update_checker = UpdateChecker(self.config, self.logger)
         
-        # Tray Icon
         self.tray_manager = TrayIconManager(self, self.logger)
-        self.tray_manager.run()
+        if PYSTRAY_AVAILABLE:
+            self.tray_manager.run()
 
         self.colors = COLORS.copy()
         self.current_font_size = 14
@@ -904,12 +939,16 @@ class Esp32DeckApp(ctk.CTk):
         if saved_font == 'Pequeno': self.current_font_size = 12
         elif saved_font == 'Grande': self.current_font_size = 18
 
+        # Inicializa a lista de widgets de botões
         self.button_frames: Dict[str, Dict[str, Any]] = {}
         
         ctk.set_appearance_mode(self.config.data.get('appearance', {}).get('theme', 'System'))
+        
         self._build_ui()
         self._load_appearance_settings()
+        
         self.logger.textbox = self.log_textbox
+        
         self._center_window()
         self.refresh_all_buttons()
         self.update_serial_ports()
@@ -919,6 +958,17 @@ class Esp32DeckApp(ctk.CTk):
         atexit.register(self._cleanup_on_exit)
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
+        
+    def _reset_icon_loader(self):
+        """Destrói e recria o IconLoader para forçar a limpeza total da memória de imagens."""
+        size = self.config.data.get('appearance', {}).get('icon_size', ICON_SIZE[0])
+        
+        if hasattr(self, 'icon_loader'):
+            self.icon_loader.clear_all_cache()
+            del self.icon_loader 
+            
+        self.icon_loader = IconLoader(icon_size=(size, size))
+
 
     def _setup_app_icon(self):
         icon_path = get_app_icon_path()
@@ -966,11 +1016,19 @@ class Esp32DeckApp(ctk.CTk):
         try:
             if isinstance(widget, ctk.CTkButton):
                 text = widget.cget("text")
-                if text in ["💾 Salvar", "🔗 Conectar", "▶️ Testar"]: widget.configure(fg_color=self.colors["success"])
-                elif text in ["🗑️ Excluir", "🔓 Desconectar", "Fechar"]: widget.configure(fg_color=self.colors["danger"])
-                elif text in ["🚫 Cancelar"]: widget.configure(fg_color="#6c757d")
-                elif text in ["🔄 Atualizar", "🔄 Restaurar Configurações Padrão", "🔄 Atualizar Portas"]: widget.configure(fg_color=self.colors["warning"])
-                else: widget.configure(fg_color=self.colors["primary"])
+                if text in ["💾 Salvar", "🔗 Conectar"]: 
+                    widget.configure(fg_color=self.colors["success"], hover_color=self.colors["success"] if self.colors["success"] != COLORS["success"] else "#1e7a30")
+                elif text in ["🗑️ Excluir", "🔓 Desconectar"]: 
+                    widget.configure(fg_color=self.colors["danger"], hover_color=self.colors["danger"] if self.colors["danger"] != COLORS["danger"] else "#a92a39")
+                elif text in ["▶️ Testar"]:
+                    widget.configure(fg_color=self.colors["primary"], hover_color=self.colors["secondary"])
+                elif text in ["🚫 Cancelar"]: 
+                    widget.configure(fg_color="#6c757d", hover_color="#5a6268")
+                elif text in ["🔄 Atualizar", "🔄 Restaurar Configurações Padrão", "🔄 Atualizar Portas"]: 
+                    widget.configure(fg_color=self.colors["warning"], text_color="black" if ctk.get_appearance_mode() == "Light" else "white", hover_color=self.colors["warning"] if self.colors["warning"] != COLORS["warning"] else "#d9a100")
+                else: 
+                    widget.configure(fg_color=self.colors["primary"], hover_color=self.colors["secondary"])
+            
             elif isinstance(widget, ctk.CTkFrame):
                 if widget.cget("border_width") > 0: widget.configure(border_color=self.colors["secondary"])
             
@@ -984,17 +1042,22 @@ class Esp32DeckApp(ctk.CTk):
                         new_font = ctk.CTkFont(size=self.current_font_size)
                     widget.configure(font=new_font)
             except Exception: pass
+            
             for child in widget.winfo_children(): self._recursive_update_widgets(child)
         except: pass
 
     def _load_appearance_settings(self):
         app = self.config.data.get('appearance', {})
         ctk.set_appearance_mode(app.get('theme', 'System'))
-        self.attributes('-alpha', app.get('transparency', 1.0))
+        transparency = app.get('transparency', 1.0)
+        self.attributes('-alpha', transparency)
+        if hasattr(self, 'transparency_var'):
+            self.transparency_var.set(transparency)
         self._on_color_scheme_change(app.get('color_scheme', 'Padrão'))
         self._on_font_size_change(app.get('font_size', 'Médio'))
 
     def _setup_theme(self): ctk.set_default_color_theme("dark-blue")
+        
     def _center_window(self):
         self.update_idletasks()
         x = (self.winfo_screenwidth() // 2) - (900 // 2)
@@ -1002,6 +1065,7 @@ class Esp32DeckApp(ctk.CTk):
         self.geometry(f'+{x}+{y}')
 
     def _on_transparency_change(self, value):
+        value = float(value)
         self.attributes('-alpha', value)
         self.transparency_label.configure(text=f"{int(value * 100)}%")
         self.config.data.setdefault('appearance', {})['transparency'] = value
@@ -1009,7 +1073,7 @@ class Esp32DeckApp(ctk.CTk):
 
     def _on_color_scheme_change(self, value):
         palettes = {
-            "Padrão": {"primary": "#510DCF", "secondary": "#1E719E", "success": "#007430", "danger": "#EB2711", "warning": "#FC6703"},
+            "Padrão": {"primary": "#2B5B84", "secondary": "#3D8BC2", "success": "#28A745", "danger": "#DC3545", "warning": "#FFC107"},
             "Moderno": {"primary": "#000981", "secondary": "#4527A0", "success": "#0D8040", "danger": "#C62828", "warning": "#915E00"},
             "Vibrante": {"primary": "#FF007F", "secondary": "#00D4FF", "success": "#39FF14", "danger": "#FF0033", "warning": "#FFE600"},
             "Suave": {"primary": "#C0A9F7", "secondary": "#6C7BB1", "success": "#69F9A6", "danger": "#FF6C6C", "warning": "#FAF48B"},
@@ -1038,15 +1102,20 @@ class Esp32DeckApp(ctk.CTk):
     def _reset_appearance(self):
         if messagebox.askyesno("Confirmar Reset", "Restaurar padrões de aparência?"):
             self.config.data['appearance'] = {'theme': 'System', 'transparency': 1.0, 'color_scheme': 'Padrão', 'font_size': 'Médio', 'minimize_to_tray': False}
+            
             ctk.set_appearance_mode('System')
             self.attributes('-alpha', 1.0)
             self.update()
+            
             self.minimize_tray_switch.deselect()
             self.theme_menu.set('System')
             self.transparency_var.set(1.0)
             self.color_scheme_menu.set('Padrão')
             self.font_size_menu.set('Médio')
+            
+            self._on_color_scheme_change('Padrão')
             self._on_font_size_change('Médio')
+            
             self.config.save()
             messagebox.showinfo("Reset", "Configurações restauradas!")
 
@@ -1061,7 +1130,13 @@ class Esp32DeckApp(ctk.CTk):
         self.tab_connection = self.tabview.add('🔌 Conexão')
         self.tab_settings = self.tabview.add('⚙️ Configurações')
         self.tab_update = self.tabview.add('🔄 Atualização')
-        self._build_buttons_tab(self.tab_buttons)
+        
+        # O _build_buttons_tab inicializa o grid do frame do botão
+        self.grid_buttons_parent = ctk.CTkFrame(self.tab_buttons, fg_color="transparent")
+        self.grid_buttons_parent.pack(expand=True, fill='both', padx=10, pady=10)
+        
+        self._build_buttons_tab(self.grid_buttons_parent) # Passa o container para os frames
+
         self._build_connection_tab(self.tab_connection)
         self._build_settings_tab(self.tab_settings)
         self._build_update_tab(self.tab_update)
@@ -1081,32 +1156,29 @@ class Esp32DeckApp(ctk.CTk):
         title_frame = ctk.CTkFrame(header, fg_color="transparent")
         title_frame.pack(side='left', padx=20, pady=10)
         ctk.CTkLabel(title_frame, text=APP_NAME, font=ctk.CTkFont(size=20, weight="bold")).pack(anchor='w')
-        ctk.CTkLabel(title_frame, text=f"v{APP_VERSION} - Controller para ESP32", font=ctk.CTkFont(size=12), text_color=COLORS["secondary"]).pack(anchor='w')
+        ctk.CTkLabel(title_frame, text=f"v{APP_VERSION} - Controller para ESP32", font=ctk.CTkFont(size=12), text_color=self.colors["secondary"]).pack(anchor='w')
         status_frame = ctk.CTkFrame(header, fg_color="transparent")
         status_frame.place(relx=0.5, rely=0.5, anchor='center')
-        self.header_status_dot = ctk.CTkLabel(status_frame, text="●", font=ctk.CTkFont(size=20), text_color=COLORS["danger"])
+        self.header_status_dot = ctk.CTkLabel(status_frame, text="●", font=ctk.CTkFont(size=20), text_color=self.colors["danger"])
         self.header_status_dot.pack(side='left', padx=(0, 5))
-        self.header_status_text = ctk.CTkLabel(status_frame, text="Desconectado", font=ctk.CTkFont(size=14, weight="bold"), text_color=COLORS["danger"])
+        self.header_status_text = ctk.CTkLabel(status_frame, text="Desconectado", font=ctk.CTkFont(size=14, weight="bold"), text_color=self.colors["danger"])
         self.header_status_text.pack(side='left')
         btn_frame = ctk.CTkFrame(header, fg_color="transparent")
         btn_frame.pack(side='right', padx=20, pady=10)
         ctk.CTkButton(btn_frame, text="ℹ️ Sobre", width=80, command=self._show_about).pack(side='right', padx=(5, 0))
-        ctk.CTkButton(btn_frame, text="💾 Salvar", width=80, command=self._save_all, fg_color=COLORS["success"]).pack(side='right', padx=5)
+        ctk.CTkButton(btn_frame, text="💾 Salvar", width=80, command=self._save_all, fg_color=self.colors["success"]).pack(side='right', padx=5)
         ctk.CTkButton(btn_frame, text="🔄 Atualizar", width=80, command=self.refresh_all).pack(side='right', padx=5)
     
     def _update_header_status(self, connected: bool):
         self.after(0, lambda: self._set_header_visuals(connected))
         
     def _set_header_visuals(self, connected: bool):
-            # 1. Atualiza Header (Topo da Janela)
-            if connected:
-                self.header_status_dot.configure(text_color=COLORS["success"])
-                self.header_status_text.configure(text="Conectado", text_color=COLORS["success"])
-            else:
-                self.header_status_dot.configure(text_color=COLORS["danger"])
-                self.header_status_text.configure(text="Desconectado", text_color=COLORS["danger"])
+            status_color = self.colors["success"] if connected else self.colors["danger"]
+            status_text = "Conectado" if connected else "Desconectado"
+            
+            self.header_status_dot.configure(text_color=status_color)
+            self.header_status_text.configure(text=status_text, text_color=status_color)
 
-            # 2. Atualiza Botões de Ação
             state_conn = 'disabled' if connected else 'normal'
             state_disc = 'normal' if connected else 'disabled'
             
@@ -1116,69 +1188,75 @@ class Esp32DeckApp(ctk.CTk):
             self.refresh_ports_btn.configure(state=state_conn)
             self.disconnect_btn.configure(state=state_disc)
 
-            # 3. Atualiza o Novo Dashboard (Aba Conexão)
             if connected:
-                # Visual Conectado
-                self.status_card.configure(border_color=COLORS["success"])
-                self.dash_icon.configure(text="⚡") # Raio ou Tomada ligada
-                self.dash_status_text.configure(text="CONECTADO", text_color=COLORS["success"])
+                self.status_card.configure(border_color=self.colors["success"])
+                self.dash_icon.configure(text="⚡")
+                self.dash_status_text.configure(text="CONECTADO", text_color=self.colors["success"])
                 self.dash_sub_text.configure(text="O sistema está pronto para receber comandos.")
                 
-                # Preenche e mostra detalhes
                 current_port = self.port_option.get()
                 current_baud = self.baud_option.get()
                 self.lbl_detail_port.configure(text=f"Porta Ativa: {current_port}")
                 self.lbl_detail_baud.configure(text=f"Velocidade:  {current_baud} bps")
-                self.details_frame.pack(fill='x', ipadx=20, ipady=10) # Mostra o painel
+                self.details_frame.pack(fill='x', ipadx=20, ipady=10)
                 
             else:
-                # Visual Desconectado
-                self.status_card.configure(border_color=COLORS["secondary"])
-                self.dash_icon.configure(text="🔌") # Tomada desligada
-                self.dash_status_text.configure(text="DESCONECTADO", text_color=COLORS["danger"])
+                self.status_card.configure(border_color=self.colors["secondary"])
+                self.dash_icon.configure(text="🔌") 
+                self.dash_status_text.configure(text="DESCONECTADO", text_color=self.colors["danger"])
                 self.dash_sub_text.configure(text="Selecione uma porta e clique em conectar.")
-                self.details_frame.pack_forget() # Esconde detalhes
+                self.details_frame.pack_forget()
 
-    def _build_buttons_tab(self, parent):
-        grid_frame = ctk.CTkFrame(parent)
-        grid_frame.pack(expand=True, fill='both', padx=10, pady=10)
+    def _build_buttons_tab(self, grid_frame):
+        """Constrói a aba de configuração de botões (Grid 4x2)."""
+        
+        # Configura o grid para 4 colunas e 2 linhas (8 botões)
         for i in range(4): grid_frame.grid_columnconfigure(i, weight=1)
         for i in range(2): grid_frame.grid_rowconfigure(i, weight=1)
+        
         btn_id = 1
         for row in range(2):
             for col in range(4):
                 key = str(btn_id)
                 self._create_button_frame(grid_frame, key, row, col)
                 btn_id += 1
+                
     def _create_button_frame(self, parent, key, row, col):
-        btn_frame = ctk.CTkFrame(parent, width=180, height=180, corner_radius=12, border_width=2, border_color=COLORS["secondary"])
+        """Cria o frame de visualização de um único botão."""
+        
+        # Se o botão já existe, destrói o frame antigo
+        if key in self.button_frames and 'frame' in self.button_frames[key]:
+            self.button_frames[key]['frame'].destroy()
+            del self.button_frames[key] # Limpa a entrada para recriar
+            
+        # 1. Cria o novo Frame do Botão
+        btn_frame = ctk.CTkFrame(parent, width=180, height=180, corner_radius=12, border_width=2, border_color=self.colors["secondary"])
         btn_frame.grid(row=row, column=col, padx=8, pady=8, sticky='nsew')
         btn_frame.grid_propagate(False)
-        icon_label = ctk.CTkLabel(btn_frame, text='📱', width=80, height=80, font=ctk.CTkFont(size=24), text_color=COLORS["primary"])
+        
+        # 2. Widgets internos
+        icon_label = ctk.CTkLabel(btn_frame, text='📱', width=80, height=80, font=ctk.CTkFont(size=24), text_color=self.colors["primary"])
         icon_label.pack(pady=(15, 5))
+        
         btn_conf = self.config.data.get('buttons', {}).get(key, {})
         title_label = ctk.CTkLabel(btn_frame, text=btn_conf.get('label', f'Botão {key}'), font=ctk.CTkFont(size=14, weight="bold"))
         title_label.pack(pady=(0, 5))
-        ctk.CTkButton(btn_frame, text='Configurar', width=120, height=28, command=lambda i=key: self.open_button_config(i), fg_color=COLORS["primary"]).pack(pady=(0, 15))
-        self.button_frames[key] = {'frame': btn_frame, 'icon_label': icon_label, 'title_label': title_label}
+        
+        ctk.CTkButton(btn_frame, text='Configurar', width=120, height=28, command=lambda i=key: self.open_button_config(i), fg_color=self.colors["primary"]).pack(pady=(0, 15))
+        
+        # 3. Armazena a referência dos novos widgets
+        self.button_frames[key] = {'frame': btn_frame, 'icon_label': icon_label, 'title_label': title_label, 'grid_row': row, 'grid_col': col}
 
-    # ---------------------------------------------------------
-    # CORREÇÃO: ABA CONEXÃO (CORES E TAMANHOS ORIGINAIS)
-    # ---------------------------------------------------------
     def _build_connection_tab(self, parent):
-        # Configuração do Grid Principal (2 Colunas)
-        parent.grid_columnconfigure(0, weight=1) # Coluna Config
-        parent.grid_columnconfigure(1, weight=2) # Coluna Status (Mais larga)
+        parent.grid_columnconfigure(0, weight=1) 
+        parent.grid_columnconfigure(1, weight=2) 
         parent.grid_rowconfigure(0, weight=1)
         
-        # ================== COLUNA ESQUERDA: CONFIGURAÇÕES ==================
         config_frame = ctk.CTkFrame(parent, corner_radius=10)
         config_frame.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=10)
         
-        # Título
         ctk.CTkLabel(config_frame, text="⚙️ Configuração", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(20, 15))
         
-        # --- Seção Porta ---
         port_frame = ctk.CTkFrame(config_frame, fg_color="transparent")
         port_frame.pack(fill='x', padx=15, pady=5)
         
@@ -1187,20 +1265,17 @@ class Esp32DeckApp(ctk.CTk):
         self.port_option = ctk.CTkOptionMenu(port_frame, values=['Nenhuma'], width=200)
         self.port_option.pack(fill='x', pady=(5, 5))
         
-        # Botão Atualizar
         self.refresh_ports_btn = ctk.CTkButton(
             port_frame, 
             text="🔄 Atualizar Portas", 
             command=self.update_serial_ports,
             fg_color=COLORS["dark"],
-            height=24 # Levemente menor apenas para diferenciar
+            height=24
         )
         self.refresh_ports_btn.pack(fill='x')
 
-        # Separador Visual
-        ctk.CTkFrame(config_frame, height=2, fg_color=COLORS["secondary"]).pack(fill='x', padx=20, pady=20)
+        ctk.CTkFrame(config_frame, height=2, fg_color=self.colors["secondary"]).pack(fill='x', padx=20, pady=20)
 
-        # --- Seção Baud Rate ---
         baud_frame = ctk.CTkFrame(config_frame, fg_color="transparent")
         baud_frame.pack(fill='x', padx=15, pady=5)
         
@@ -1211,56 +1286,47 @@ class Esp32DeckApp(ctk.CTk):
         self.baud_option.set(str(self.config.data.get('serial', {}).get('baud', DEFAULT_SERIAL_BAUD)))
         self.baud_option.pack(fill='x', pady=5)
 
-        # Espaçador
         ctk.CTkLabel(config_frame, text="").pack(expand=True)
 
-        # --- Botões de Ação (Volta ao Padrão) ---
         action_frame = ctk.CTkFrame(config_frame, fg_color="transparent")
         action_frame.pack(fill='x', padx=15, pady=20)
 
         self.connect_btn = ctk.CTkButton(
             action_frame, 
-            text="🔗 Conectar",  # ✅ Texto corrigido para o sistema de cores reconhecer
+            text="🔗 Conectar", 
             command=self._connect_serial, 
-            fg_color=COLORS["success"] # ✅ Verde forçado
+            fg_color=self.colors["success"]
         )
         self.connect_btn.pack(fill='x', pady=(0, 10))
 
         self.disconnect_btn = ctk.CTkButton(
             action_frame, 
-            text="🔓 Desconectar", # ✅ Texto corrigido
+            text="🔓 Desconectar", 
             command=self._disconnect_serial, 
             state='disabled', 
-            fg_color=COLORS["danger"] # ✅ Vermelho forçado
+            fg_color=self.colors["danger"]
         )
         self.disconnect_btn.pack(fill='x')
 
-        # ================== COLUNA DIREITA: STATUS DASHBOARD ==================
-        self.status_card = ctk.CTkFrame(parent, corner_radius=10, border_width=2, border_color=COLORS["secondary"])
+        self.status_card = ctk.CTkFrame(parent, corner_radius=10, border_width=2, border_color=self.colors["secondary"])
         self.status_card.grid(row=0, column=1, sticky="nsew", padx=(5, 10), pady=10)
         
-        # Centralizador
         status_content = ctk.CTkFrame(self.status_card, fg_color="transparent")
         status_content.place(relx=0.5, rely=0.5, anchor='center')
 
-        # Ícone Gigante
         self.dash_icon = ctk.CTkLabel(status_content, text="🔌", font=ctk.CTkFont(size=80))
         self.dash_icon.pack(pady=(0, 10))
 
-        # Status Texto Principal
-        self.dash_status_text = ctk.CTkLabel(status_content, text="DESCONECTADO", font=ctk.CTkFont(size=24, weight="bold"), text_color=COLORS["danger"])
+        self.dash_status_text = ctk.CTkLabel(status_content, text="DESCONECTADO", font=ctk.CTkFont(size=24, weight="bold"), text_color=self.colors["danger"])
         self.dash_status_text.pack(pady=5)
 
-        # Subtexto
         self.dash_sub_text = ctk.CTkLabel(status_content, text="O dispositivo não está comunicando.", font=ctk.CTkFont(size=14), text_color="gray")
         self.dash_sub_text.pack(pady=(0, 30))
 
-        # --- Painel de Detalhes Técnicos ---
-        self.details_frame = ctk.CTkFrame(status_content, fg_color=COLORS["dark"], corner_radius=8)
+        self.details_frame = ctk.CTkFrame(status_content, fg_color=self.colors["dark"], corner_radius=8)
         self.details_frame.pack(fill='x', ipadx=20, ipady=10)
         self.details_frame.pack_forget() 
 
-        # Labels de Detalhes
         self.lbl_detail_port = ctk.CTkLabel(self.details_frame, text="Porta: -", font=ctk.CTkFont(family="Consolas", size=12))
         self.lbl_detail_port.pack(anchor='w')
         
@@ -1270,25 +1336,18 @@ class Esp32DeckApp(ctk.CTk):
         self.lbl_detail_proto = ctk.CTkLabel(self.details_frame, text="Protocolo: Serial/UART", font=ctk.CTkFont(family="Consolas", size=12))
         self.lbl_detail_proto.pack(anchor='w')
 
-# ---------------------------------------------------------
-    # NOVA ABA DE CONFIGURAÇÕES (ESTILIZADA)
-    # ---------------------------------------------------------
     def _build_settings_tab(self, parent):
-        # Configuração do Grid Principal (2 Colunas iguais)
         parent.grid_columnconfigure(0, weight=1)
         parent.grid_columnconfigure(1, weight=1)
-        parent.grid_rowconfigure(0, weight=1) # Conteúdo principal
-        parent.grid_rowconfigure(1, weight=0) # Rodapé (Reset)
+        parent.grid_rowconfigure(0, weight=1)
+        parent.grid_rowconfigure(1, weight=0)
 
-        # ================== CARD 1: APARÊNCIA VISUAL (ESQUERDA) ==================
         visual_frame = ctk.CTkFrame(parent, corner_radius=10)
         visual_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         
-        # Título do Card
-        ctk.CTkLabel(visual_frame, text="🎨 Aparência Visual", font=ctk.CTkFont(size=18, weight="bold"), text_color=COLORS["secondary"]).pack(pady=(20, 15))
+        ctk.CTkLabel(visual_frame, text="🎨 Aparência Visual", font=ctk.CTkFont(size=18, weight="bold"), text_color=self.colors["secondary"]).pack(pady=(20, 15))
         ctk.CTkLabel(visual_frame, text="Personalize as cores e o tema", font=ctk.CTkFont(size=12), text_color="gray").pack(pady=(0, 20))
 
-        # --- Seção Tema ---
         theme_box = ctk.CTkFrame(visual_frame, fg_color="transparent")
         theme_box.pack(fill='x', padx=20, pady=10)
         ctk.CTkLabel(theme_box, text="Modo do Tema", font=ctk.CTkFont(weight="bold"), anchor="w").pack(fill='x')
@@ -1300,12 +1359,10 @@ class Esp32DeckApp(ctk.CTk):
             height=35
         )
         self.theme_menu.pack(fill='x', pady=(5, 0))
-        # Setar valor atual
         curr_theme = self.config.data.get('appearance', {}).get('theme', 'System')
         display_theme = {'System': 'System', 'Light': 'Claro', 'Dark': 'Escuro'}.get(curr_theme, 'System')
         self.theme_menu.set(display_theme)
 
-        # --- Seção Cores ---
         color_box = ctk.CTkFrame(visual_frame, fg_color="transparent")
         color_box.pack(fill='x', padx=20, pady=10)
         ctk.CTkLabel(color_box, text="Esquema de Cores (Botões)", font=ctk.CTkFont(weight="bold"), anchor="w").pack(fill='x')
@@ -1319,7 +1376,6 @@ class Esp32DeckApp(ctk.CTk):
         self.color_scheme_menu.pack(fill='x', pady=(5, 0))
         self.color_scheme_menu.set(self.config.data.get('appearance', {}).get('color_scheme', 'Padrão'))
 
-        # --- Seção Fonte ---
         font_box = ctk.CTkFrame(visual_frame, fg_color="transparent")
         font_box.pack(fill='x', padx=20, pady=10)
         ctk.CTkLabel(font_box, text="Tamanho do Texto", font=ctk.CTkFont(weight="bold"), anchor="w").pack(fill='x')
@@ -1333,16 +1389,13 @@ class Esp32DeckApp(ctk.CTk):
         self.font_size_menu.pack(fill='x', pady=(5, 0))
         self.font_size_menu.set(self.config.data.get('appearance', {}).get('font_size', 'Médio'))
 
-        # ================== CARD 2: SISTEMA & COMPORTAMENTO (DIREITA) ==================
         system_frame = ctk.CTkFrame(parent, corner_radius=10)
         system_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
 
-        # Título do Card
-        ctk.CTkLabel(system_frame, text="⚙️ Sistema & Janela", font=ctk.CTkFont(size=18, weight="bold"), text_color=COLORS["secondary"]).pack(pady=(20, 15))
+        ctk.CTkLabel(system_frame, text="⚙️ Sistema & Janela", font=ctk.CTkFont(size=18, weight="bold"), text_color=self.colors["secondary"]).pack(pady=(20, 15))
         ctk.CTkLabel(system_frame, text="Comportamento e opacidade", font=ctk.CTkFont(size=12), text_color="gray").pack(pady=(0, 20))
 
-        # --- Seção System Tray ---
-        tray_box = ctk.CTkFrame(system_frame, fg_color="transparent", border_width=1, border_color=COLORS["secondary"], corner_radius=8)
+        tray_box = ctk.CTkFrame(system_frame, fg_color="transparent", border_width=1, border_color=self.colors["secondary"], corner_radius=8)
         tray_box.pack(fill='x', padx=20, pady=10, ipady=5)
         
         tray_label_frame = ctk.CTkFrame(tray_box, fg_color="transparent")
@@ -1366,19 +1419,17 @@ class Esp32DeckApp(ctk.CTk):
         else:
             self.minimize_tray_switch.deselect()
 
-        # --- Seção Transparência ---
         trans_box = ctk.CTkFrame(system_frame, fg_color="transparent")
         trans_box.pack(fill='x', padx=20, pady=20)
         
         header_trans = ctk.CTkFrame(trans_box, fg_color="transparent")
         header_trans.pack(fill='x', pady=(0, 5))
         ctk.CTkLabel(header_trans, text="Transparência da Janela", font=ctk.CTkFont(weight="bold")).pack(side='left')
-        self.transparency_label = ctk.CTkLabel(header_trans, text="100%", font=ctk.CTkFont(weight="bold"), text_color=COLORS["secondary"])
+        self.transparency_label = ctk.CTkLabel(header_trans, text="100%", font=ctk.CTkFont(weight="bold"), text_color=self.colors["secondary"])
         self.transparency_label.pack(side='right')
 
         self.transparency_var = tk.DoubleVar(value=self.config.data.get('appearance', {}).get('transparency', 1.0))
         
-        # Callback para atualizar o label em tempo real enquanto arrasta
         def update_label(val):
             self.transparency_label.configure(text=f"{int(float(val)*100)}%")
             self._on_transparency_change(val)
@@ -1392,8 +1443,9 @@ class Esp32DeckApp(ctk.CTk):
             command=update_label,
             height=20
         ).pack(fill='x', pady=5)
+        
+        update_label(self.transparency_var.get())
 
-        # ================== RODAPÉ: ZONA DE RESET ==================
         reset_frame = ctk.CTkFrame(parent, fg_color="transparent")
         reset_frame.grid(row=1, column=0, columnspan=2, sticky="ew", padx=20, pady=10)
         
@@ -1405,7 +1457,7 @@ class Esp32DeckApp(ctk.CTk):
             command=self._reset_appearance,
             fg_color=COLORS["dark"], 
             border_width=1,
-            border_color=COLORS["secondary"],
+            border_color=self.colors["secondary"],
             height=32
         ).pack(side='right')
         
@@ -1415,60 +1467,50 @@ class Esp32DeckApp(ctk.CTk):
         ctk.set_appearance_mode(english)
         self.config.data.setdefault('appearance', {})['theme'] = english
         self.config.save()
+        self._on_color_scheme_change(self.color_scheme_menu.get())
 
     def _build_update_tab(self, parent):
-            # Layout Principal da Aba
-            parent.grid_columnconfigure(0, weight=1)
-            parent.grid_rowconfigure(0, weight=1) # Conteúdo
-            
-            main_container = ctk.CTkFrame(parent, corner_radius=10, fg_color="transparent")
-            main_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-            
-            # --- 1. Área de Cards (Comparação) ---
-            cards_frame = ctk.CTkFrame(main_container, fg_color="transparent")
-            cards_frame.pack(fill='x', pady=(10, 20))
-            
-            # Card Esquerda: Versão Local
-            self._create_version_card(cards_frame, "Sua Versão", APP_VERSION, COLORS["secondary"], "left")
-            
-            # Separador (Seta)
-            arrow_label = ctk.CTkLabel(cards_frame, text="➜", font=ctk.CTkFont(size=24), text_color="gray")
-            arrow_label.pack(side='left', padx=10)
-            
-            # Card Direita: Versão Remota (Inicia igual a local conforme pedido)
-            self.remote_version_var = tk.StringVar(value=APP_VERSION)
-            self.remote_card_frame = self._create_version_card(cards_frame, "Versão no Servidor", self.remote_version_var, COLORS["dark"], "right")
+        parent.grid_columnconfigure(0, weight=1)
+        parent.grid_rowconfigure(0, weight=1)
+        
+        main_container = ctk.CTkFrame(parent, corner_radius=10, fg_color="transparent")
+        main_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        
+        cards_frame = ctk.CTkFrame(main_container, fg_color="transparent")
+        cards_frame.pack(fill='x', pady=(10, 20))
+        
+        self._create_version_card(cards_frame, "Sua Versão", APP_VERSION, self.colors["secondary"], "left")
+        
+        arrow_label = ctk.CTkLabel(cards_frame, text="➜", font=ctk.CTkFont(size=24), text_color="gray")
+        arrow_label.pack(side='left', padx=10)
+        
+        self.remote_version_var = tk.StringVar(value=APP_VERSION)
+        self.remote_card_frame = self._create_version_card(cards_frame, "Versão no Servidor", self.remote_version_var, self.colors["dark"], "right")
 
-            # --- 2. Área de Status e Ação ---
-            action_frame = ctk.CTkFrame(main_container, corner_radius=8, border_width=1, border_color=COLORS["secondary"])
-            action_frame.pack(fill='both', expand=True, padx=10, pady=10)
-            
-            # Ícone de Status Grande
-            self.status_icon_label = ctk.CTkLabel(action_frame, text="☁️", font=ctk.CTkFont(size=40))
-            self.status_icon_label.pack(pady=(20, 5))
-            
-            # Título do Status
-            self.status_title_label = ctk.CTkLabel(action_frame, text="Sistema Pronto", font=ctk.CTkFont(size=16, weight="bold"))
-            self.status_title_label.pack(pady=(0, 5))
-            
-            # Detalhes do Status (Log visual)
-            self.status_detail_label = ctk.CTkLabel(action_frame, text="Clique em 'Verificar' para buscar atualizações.", text_color="gray")
-            self.status_detail_label.pack(pady=(0, 20))
-            
-            # Botão de Ação
-            self.check_update_btn = ctk.CTkButton(
-                action_frame, 
-                text="🔍 Verificar Agora", 
-                command=self._check_update_thread,
-                font=ctk.CTkFont(size=14, weight="bold"),
-                height=40,
-                fg_color=COLORS["primary"]
-            )
-            self.check_update_btn.pack(pady=(0, 20))
+        action_frame = ctk.CTkFrame(main_container, corner_radius=8, border_width=1, border_color=self.colors["secondary"])
+        action_frame.pack(fill='both', expand=True, padx=10, pady=10)
+        
+        self.status_icon_label = ctk.CTkLabel(action_frame, text="☁️", font=ctk.CTkFont(size=40))
+        self.status_icon_label.pack(pady=(20, 5))
+        
+        self.status_title_label = ctk.CTkLabel(action_frame, text="Sistema Pronto", font=ctk.CTkFont(size=16, weight="bold"))
+        self.status_title_label.pack(pady=(0, 5))
+        
+        self.status_detail_label = ctk.CTkLabel(action_frame, text="Clique em 'Verificar' para buscar atualizações.", text_color="gray")
+        self.status_detail_label.pack(pady=(0, 20))
+        
+        self.check_update_btn = ctk.CTkButton(
+            action_frame, 
+            text="🔍 Verificar Agora", 
+            command=self._check_update_thread,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            height=40,
+            fg_color=self.colors["primary"]
+        )
+        self.check_update_btn.pack(pady=(0, 20))
 
-            # Rodapé com data
-            self.last_check_label = ctk.CTkLabel(main_container, text="Última verificação: Nunca", font=ctk.CTkFont(size=10), text_color="gray")
-            self.last_check_label.pack(side='bottom', pady=5)
+        self.last_check_label = ctk.CTkLabel(main_container, text="Última verificação: Nunca", font=ctk.CTkFont(size=10), text_color="gray")
+        self.last_check_label.pack(side='bottom', pady=5)
     
     def _create_version_card(self, parent, title, value_var, color, side):
         card = ctk.CTkFrame(parent, corner_radius=10, border_width=2, border_color=color)
@@ -1476,7 +1518,6 @@ class Esp32DeckApp(ctk.CTk):
         
         ctk.CTkLabel(card, text=title, font=ctk.CTkFont(size=12, weight="bold"), text_color="gray").pack(pady=(15, 5))
         
-        # Aceita tanto string direta quanto StringVar
         if isinstance(value_var, tk.StringVar):
             lbl = ctk.CTkLabel(card, textvariable=value_var, font=ctk.CTkFont(size=22, weight="bold"), text_color=color)
         else:
@@ -1486,56 +1527,58 @@ class Esp32DeckApp(ctk.CTk):
         return card
 
     def refresh_all(self):
+        # Reinicia o loader e recria o painel de botões
+        self._reset_icon_loader() 
         self.refresh_all_buttons()
         self.update_serial_ports()
         self.logger.info("Interface atualizada")
         
     def refresh_all_buttons(self):
-        for key, widget_map in self.button_frames.items():
-            # Pega a configuração atualizada
-            btn_conf = self.config.data.get('buttons', {}).get(key, {})
-            
-            # Atualiza o Texto
-            new_label = btn_conf.get('label', f'Botão {key}')
-            widget_map['title_label'].configure(text=new_label)
-            
-            # Atualiza o Ícone
-            icon_path = btn_conf.get('icon', '')
-            
-            # Se não há ícone definido, garante que fique vazio
-            if not icon_path:
-                widget_map['icon_label'].configure(image=None, text='📱')
-                widget_map['icon_label'].image = None  # Importante: remove referência
-                continue
+        """
+        Recria completamente todos os frames de botão para forçar o redesenho da tela
+        e eliminar referências de ícones fantasmas.
+        """
+        
+        btn_id = 1
+        for row in range(2):
+            for col in range(4):
+                key = str(btn_id)
                 
-            # Tenta carregar a imagem
-            ctk_img = None
-            if icon_path and os.path.exists(icon_path):
-                ctk_img = self.icon_loader.load_icon_from_path(icon_path)
-                if not ctk_img and icon_path.lower().endswith('.exe'):
-                    ctk_img = self.icon_loader.try_load_windows_exe_icon(icon_path)
+                # RECRIA O FRAME DO ZERO
+                self._create_button_frame(self.grid_buttons_parent, key, row, col)
+                
+                # Configura o novo frame com as informações atualizadas
+                btn_conf = self.config.data.get('buttons', {}).get(key, {})
+                icon_path = btn_conf.get('icon', '')
+                
+                # Tenta carregar o ícone
+                ctk_img = None
+                if icon_path and os.path.exists(icon_path):
+                    ctk_img = self.icon_loader.load_icon_from_path(icon_path)
 
-            # Aplica no Widget
-            if ctk_img:
-                widget_map['icon_label'].configure(image=ctk_img, text='')
-                widget_map['icon_label'].image = ctk_img  # Mantém referência
-            else:
-                # Limpa completamente o ícone
-                widget_map['icon_label'].configure(image=None, text='📱')
-                widget_map['icon_label'].image = None
+                # Aplica o ícone ou o placeholder
+                widget_map = self.button_frames[key]
+                if ctk_img:
+                    widget_map['icon_label'].configure(image=ctk_img, text='')
+                    widget_map['icon_label'].image = ctk_img
+                else:
+                    widget_map['icon_label'].configure(image=None, text='📱')
+                    widget_map['icon_label'].image = None
                 
-            # Força atualização visual
-            widget_map['icon_label'].update_idletasks()
+                btn_id += 1
+
+        self.update() # Força a atualização de todos os widgets na tela
 
     def open_button_config(self, button_key: str):
         if 'buttons' not in self.config.data:
             self.config.data['buttons'] = self.config._default()['buttons']
             self.config.save()
+            
         conf = self.config.data['buttons'][button_key]
         dlg = ButtonConfigDialog(self, button_key, conf, self.icon_loader, self.logger)
         self.wait_window(dlg)
+        
         self.config.save()
-        self.refresh_all_buttons()
 
     def update_serial_ports(self):
         ports = self.serial_manager.list_ports() or ['Nenhuma']
@@ -1547,28 +1590,38 @@ class Esp32DeckApp(ctk.CTk):
 
     def _connect_serial(self):
         port = self.port_option.get()
-        if not port or port == 'Nenhuma': return
-        if self.serial_manager.connect(port, int(self.baud_option.get())):
+        if not port or port == 'Nenhuma': 
+            self.logger.warn("Selecione uma porta válida para conectar.")
+            return
+            
+        baud = int(self.baud_option.get())
+        if self.serial_manager.connect(port, baud):
             self.config.data['serial']['port'] = port
-            self.config.data['serial']['baud'] = int(self.baud_option.get())
+            self.config.data['serial']['baud'] = baud
             self.config.save()
 
     def _disconnect_serial(self): self.serial_manager.disconnect()
+        
     def _clear_log(self):
         self.log_textbox.configure(state='normal')
         self.log_textbox.delete('1.0', 'end')
         self.log_textbox.configure(state='disabled')
+        
     def _on_baud_change(self, value):
         self.config.data['serial']['baud'] = int(value)
         self.config.save()
+        
     def _save_all(self):
-        if self.config.save(): messagebox.showinfo("Sucesso", "Configurações salvas!")
-        else: messagebox.showerror("Erro", "Erro ao salvar!")
+        if self.config.save(): 
+            messagebox.showinfo("Sucesso", "Configurações salvas!")
+        else: 
+            messagebox.showerror("Erro", "Erro ao salvar!")
+            
     def _show_about(self): AboutDialog(self)
 
     def _check_update_thread(self):
         self.check_update_btn.configure(state='disabled', text="Conectando...")
-        self.status_title_label.configure(text="Verificando...", text_color=COLORS["primary"])
+        self.status_title_label.configure(text="Verificando...", text_color=self.colors["primary"])
         self.status_detail_label.configure(text="Aguarde, contatando servidor...")
         self.status_icon_label.configure(text="⏳")
         
@@ -1576,76 +1629,72 @@ class Esp32DeckApp(ctk.CTk):
         t.start()
 
     def _check_update(self):
-        # Simula um pequeno delay para UX (opcional, remove sensação de 'piscar')
         time.sleep(0.5) 
-        
         self.logger.info('Iniciando verificação de atualização...')
         res = self.update_checker.check_update()
-        
-        # Atualiza GUI na thread principal
         self.after(0, lambda: self._process_update_result(res))
 
     def _process_update_result(self, res):
         timestamp = time.strftime("%H:%M:%S")
         self.last_check_label.configure(text=f"Última verificação: Hoje às {timestamp}")
         self.check_update_btn.configure(state='normal', text="🔍 Verificar Novamente")
+        self.check_update_btn.configure(
+            command=self._check_update_thread, 
+            fg_color=self.colors["primary"],
+            text_color="white"
+        )
 
         if not res.get('ok'):
-            # --- ERRO ---
             error_msg = res.get("error", "Desconhecido")
             self.logger.error(f'Falha na atualização: {error_msg}')
-            
             self.status_icon_label.configure(text="❌")
-            self.status_title_label.configure(text="Falha na Conexão", text_color=COLORS["danger"])
-            
-            # Quebra o texto se for muito longo
+            self.status_title_label.configure(text="Falha na Conexão", text_color=self.colors["danger"])
             if len(error_msg) > 60: error_msg = error_msg[:57] + "..."
             self.status_detail_label.configure(text=error_msg)
-            
-            # Reseta a versão remota para a atual (fallback)
             self.remote_version_var.set(APP_VERSION)
-            self.remote_card_frame.configure(border_color=COLORS["danger"])
+            self.remote_card_frame.configure(border_color=self.colors["danger"])
             
         else:
             latest = res.get('latest')
             self.remote_version_var.set(latest)
             
             if res.get('is_new'):
-                # --- NOVA VERSÃO DISPONÍVEL ---
                 self.logger.info(f'Atualização encontrada: {latest}')
-                
                 self.status_icon_label.configure(text="🎉")
-                self.status_title_label.configure(text="Nova Versão Disponível!", text_color=COLORS["warning"])
+                self.status_title_label.configure(text="Nova Versão Disponível!", text_color=self.colors["warning"])
                 self.status_detail_label.configure(text=f"A versão {latest} está pronta para download.")
-                self.remote_card_frame.configure(border_color=COLORS["warning"])
+                self.remote_card_frame.configure(border_color=self.colors["warning"])
                 
-                # Muda o botão para Download
                 self.check_update_btn.configure(
                     text="⬇️ Baixar Atualização",
-                    fg_color=COLORS["warning"],
-                    text_color="black", # Melhor contraste no amarelo
+                    fg_color=self.colors["warning"],
+                    text_color="black",
                     command=lambda: webbrowser.open(res.get('download_url'))
                 )
                 
                 if messagebox.askyesno('Atualização', f'Nova versão {latest} encontrada!\nDeseja abrir a página de download agora?'):
                     webbrowser.open(res.get('download_url'))
             else:
-                # --- TUDO ATUALIZADO ---
                 self.logger.info('Sistema já está atualizado.')
-                
                 self.status_icon_label.configure(text="✅")
-                self.status_title_label.configure(text="Você está atualizado", text_color=COLORS["success"])
+                self.status_title_label.configure(text="Você está atualizado", text_color=self.colors["success"])
                 self.status_detail_label.configure(text=f"A versão {latest} é a mais recente.")
-                self.remote_card_frame.configure(border_color=COLORS["success"])
-                self.check_update_btn.configure(fg_color=COLORS["success"], text="🔍 Verificar Novamente")
-
+                self.remote_card_frame.configure(border_color=self.colors["success"])
+                self.check_update_btn.configure(fg_color=self.colors["success"], text="🔍 Verificar Novamente")
 
     def _on_serial_message(self, text: str):
         self.logger.info(f'<- ESP: {text}')
+        
         if text.startswith('BTN:'):
             key = text.split(':')[1]
             btn_conf = self.config.data['buttons'].get(key)
-            if btn_conf: self.action_manager.perform(Action(btn_conf.get('action', {}).get('type', 'none'), btn_conf.get('action', {}).get('payload', '')))
+            if btn_conf: 
+                self.action_manager.perform(
+                    Action(
+                        btn_conf.get('action', {}).get('type', 'none'), 
+                        btn_conf.get('action', {}).get('payload', '')
+                    )
+                )
 
 def main():
     ctk.set_appearance_mode('System')
