@@ -13,16 +13,16 @@
             "label": "Botão 2",
             "icon": "",
             "action": {
-                "type": "open_program",
+                "type": "none",
                 "payload": ""
             }
         },
         "3": {
             "label": "Botão 3",
-            "icon": "",
+            "icon": "icons\\btn3_chrome.png",
             "action": {
                 "type": "open_program",
-                "payload": ""
+                "payload": "C:/Program Files/Google/Chrome/Application/chrome.exe"
             }
         },
         "4": {
@@ -74,7 +74,8 @@
         "theme": "Dark",
         "transparency": 1.0,
         "color_scheme": "Moderno",
-        "font_size": "Médio"
+        "font_size": "Médio",
+        "minimize_to_tray": true
     },
     "update": {
         "check_url": "https://raw.githubusercontent.com/yourrepo/streamdeck/main/version.json"
