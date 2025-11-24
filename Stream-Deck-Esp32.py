@@ -104,9 +104,15 @@ def safe_makedirs(path: str):
 # Icon Path
 # -----------------------------
 def get_app_icon_path() -> str:
-    """Retorna o caminho absoluto para o ícone da aplicação"""
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), APP_ICON_NAME))
-
+    """Retorna o caminho absoluto para o ícone da aplicação, tratando o ambiente PyInstaller."""
+    base_path = os.path.abspath(os.path.dirname(__file__))
+    
+    # 🌟 CORREÇÃO: Trata o caminho temporário do PyInstaller
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        base_path = sys._MEIPASS
+    
+    # Retorna o caminho completo para o ícone
+    return os.path.abspath(os.path.join(base_path, APP_ICON_NAME))
 # -----------------------------
 # Logger (Filtered)
 # -----------------------------
@@ -924,6 +930,7 @@ class ButtonConfigDialog(ctk.CTkToplevel):
 class Esp32DeckApp(ctk.CTk):
     def __init__(self):
         super().__init__()
+        ctk.deactivate_automatic_dpi_awareness()
         self.title(f'{APP_NAME} v{APP_VERSION}')
         self.geometry('900x700')
         self.resizable(False, False)

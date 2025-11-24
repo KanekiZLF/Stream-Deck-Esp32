@@ -1,0 +1,41 @@
+# FILE: version_info.txt (Corrigido, Sem a instrução 'import')
+#
+# O PyInstaller só processa a expressão final VSVersionInfo.
+
+VSVersionInfo(
+    ffi=FixedFileInfo(
+        # Versões: 1.5.12.0
+        filevers=(1, 5, 12, 0),
+        prodvers=(1, 5, 12, 0),
+        
+        # Flags padrão
+        mask=0x3f,
+        flags=0x0,
+        OS=0x40004, # VOS_NT_WINDOWS32
+        fileType=0x1, # VFT_APP
+        subtype=0x0,
+        date=(0, 0)
+    ),
+    kids=[
+        StringFileInfo(
+            [
+                StringTable(
+                    # Language ID: 0416 (Portuguese - Brazil), Codepage: 1200 (Unicode)
+                    u'041604b0',
+                    [
+                        StringStruct(u'CompanyName', u'Luiz F. R. Pimentel'),
+                        StringStruct(u'FileDescription', u'Controller para ESP32 Deck - Atalhos e Automação'),
+                        StringStruct(u'FileVersion', u'1.5.12'),
+                        StringStruct(u'InternalName', u'Esp32DeckController'),
+                        StringStruct(u'LegalCopyright', u'Copyright © 2025 Luiz F. R. Pimentel. Todos os direitos reservados.'),
+                        StringStruct(u'OriginalFilename', u'Esp32 Deck Controller.exe'),
+                        StringStruct(u'ProductName', u'Esp32 Deck Controller'),
+                        StringStruct(u'ProductVersion', u'1.5.12')
+                    ]
+                )
+            ]
+        ),
+        # Bloco de tradução (PT-BR: 1046)
+        VarFileInfo([VarStruct(u'Translation', [1046, 1200])])
+    ]
+)

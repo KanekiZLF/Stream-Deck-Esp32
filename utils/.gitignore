@@ -1,0 +1,31 @@
+# Ignorar a pasta de configurações do Visual Studio Code
+.vscode/
+
+# Outras pastas e arquivos comuns a serem ignorados
+config.json
+Esp32_deck.log
+token.txt
+icons/
+
+# Arquivos de dependências de projetos (Node.js, Python, etc.)
+node_modules/
+venv/
+env/
+.env
+
+# Arquivos de build e logs
+dist/
+build/
+output/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Arquivos de sistema operacional
+.DS_Store
+Thumbs.db
+
+# Arquivos de IDEs e editores
+.idea/
+*.swp

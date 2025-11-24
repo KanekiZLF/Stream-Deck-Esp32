@@ -1,0 +1,46 @@
+
+--- Starting session Mon Nov 24 14:51:04 2025 ---
+[2025-11-24 14:53:04] [INFO] 🔌 Porta serial fechada
+[2025-11-24 14:53:08] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: CONNECTED
+[2025-11-24 14:53:08] [DEBUG] 📨 Recebido serial: 🎉 STATUS: Conectado ao software Python
+[2025-11-24 14:53:08] [DEBUG] 📨 Recebido serial: ✅ Conexão estabelecida com software
+[2025-11-24 14:53:13] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 14:53:13] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 14:53:13] [DEBUG] Executando ação: open_program
+[2025-11-24 14:53:14] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 14:53:14] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 14:53:14] [DEBUG] Executando ação: open_program
+[2025-11-24 14:53:15] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 14:53:15] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 14:53:15] [DEBUG] Executando ação: open_program
+[2025-11-24 14:53:16] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 14:53:16] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 14:53:16] [DEBUG] Executando ação: open_program
+[2025-11-24 14:53:16] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 14:53:16] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 14:53:16] [DEBUG] Executando ação: open_program
+[2025-11-24 14:53:53] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 14:53:53] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: DISCONNECT
+[2025-11-24 14:53:54] [INFO] 🔌 Porta serial fechada
+[2025-11-24 14:53:54] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 14:54:14 2025 ---
+[2025-11-24 14:54:20] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: CONNECTED
+[2025-11-24 14:54:20] [DEBUG] 📨 Recebido serial: 🎉 STATUS: Conectado ao software Python
+[2025-11-24 14:54:21] [DEBUG] 📨 Recebido serial: ✅ Conexão estabelecida com software
+[2025-11-24 14:54:40] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 14:54:40] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: DISCONNECT
+[2025-11-24 14:54:41] [INFO] 🔌 Porta serial fechada
+[2025-11-24 14:54:41] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 14:59:36 2025 ---
+[2025-11-24 15:01:47] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 15:01:48] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 15:01:56 2025 ---
+[2025-11-24 15:02:43] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 15:02:43] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 15:06:34 2025 ---
+[2025-11-24 15:08:33] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 15:08:33] [INFO] 🚪 Fechando aplicação...

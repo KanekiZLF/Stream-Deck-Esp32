@@ -1,0 +1,84 @@
+{
+    "version": "1.5.12",
+    "buttons": {
+        "1": {
+            "label": "Botão 1",
+            "icon": "",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "2": {
+            "label": "Botão 2",
+            "icon": "",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "3": {
+            "label": "Botão 3",
+            "icon": "",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "4": {
+            "label": "Botão 4",
+            "icon": "",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "5": {
+            "label": "Botão 5",
+            "icon": "",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "6": {
+            "label": "Botão 6",
+            "icon": "",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "7": {
+            "label": "Botão 7",
+            "icon": "",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "8": {
+            "label": "Botão 8",
+            "icon": "",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        }
+    },
+    "serial": {
+        "port": "COM3",
+        "baud": 115200
+    },
+    "appearance": {
+        "theme": "Dark",
+        "icon_size": 64,
+        "minimize_to_tray": false,
+        "font_size": "Médio",
+        "transparency": 1.0,
+        "color_scheme": "Moderno"
+    },
+    "update": {
+        "check_url": "https://raw.githubusercontent.com/KanekiZLF/Stream-Deck-Esp32/refs/heads/main/version.txt"
+    }
+}
