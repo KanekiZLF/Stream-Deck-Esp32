@@ -3,10 +3,10 @@
     "buttons": {
         "1": {
             "label": "Botão 1",
-            "icon": "icons\\btn1_chrome.png",
+            "icon": "",
             "action": {
-                "type": "open_program",
-                "payload": "C:/Program Files/Google/Chrome/Application/chrome.exe"
+                "type": "none",
+                "payload": ""
             }
         },
         "2": {
@@ -79,6 +79,6 @@
         "icon_size": 64
     },
     "update": {
-        "check_url": "https://raw.githubusercontent.com/KanekiZLF/StreamDeck-ESP32/main/update_info.json"
+        "check_url": "https://raw.githubusercontent.com/KanekiZLF/PrismaFX---Gerador-ImageFX-em-Lote/master/version.txt"
     }
 }

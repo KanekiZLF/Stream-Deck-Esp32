@@ -66,12 +66,12 @@ except ImportError:
 CONFIG_FILE = "Esp32_deck_config.json"
 ICON_FOLDER = "icons"
 LOG_FILE = "Esp32_deck.log"
-APP_VERSION = "1.5.11" # Versão: Correção Final via Recriação de Widget (Destroy/Recreate)
+APP_VERSION = "1.5.12" # Versão: Correção da Exclusão do Arquivo de Ícone
 APP_NAME = "Esp32 Deck Controller"
 APP_ICON_NAME = "app_icon.ico"
 DEVELOPER = "Luiz F. R. Pimentel"
-GITHUB_URL = "https://github.com/KanekiZLF"
-UPDATE_CHECK_URL = "https://raw.githubusercontent.com/KanekiZLF/PrismaFX---Gerador-ImageFX-em-Lote/refs/heads/master/version.txt"
+GITHUB_URL = "https://github.com/KanekiZLF/Stream-Deck-Esp32"
+UPDATE_CHECK_URL = "https://raw.githubusercontent.com/KanekiZLF/PrismaFX---Gerador-ImageFX-em-Lote/master/version.txt"
 DEFAULT_SERIAL_BAUD = 115200
 BUTTON_COUNT = 8
 ICON_SIZE = (64, 64)
@@ -616,8 +616,10 @@ class UpdateChecker:
         self.logger = logger
 
     def check_update(self) -> Dict[str, Any]:
+        """Verifica a versão mais recente no servidor remoto, lendo um arquivo TXT simples."""
+        # Garantindo que a URL correta esteja na config
         url = self.config.data.get('update', {}).get('check_url', UPDATE_CHECK_URL)
-        
+
         if not REQUESTS_AVAILABLE:
             return {"ok": False, "error": "Biblioteca 'requests' não instalada"}
         
@@ -625,21 +627,27 @@ class UpdateChecker:
             response = requests.get(url, timeout=10)
             response.raise_for_status()
             
-            info = response.json()
-            latest = info.get('latest_version')
-            download = info.get('download_url')
+            # 1. Lê o corpo da resposta e remove espaços/quebras de linha
+            latest_version_raw = response.text.strip()
             
-            if not latest:
-                return {"ok": False, "error": "Versão não encontrada no servidor"}
+            # 2. Assume que a URL de download é a URL do repositório (ajuste se necessário)
+            download_url = GITHUB_URL # Usando a constante do projeto
             
+            if not latest_version_raw:
+                return {"ok": False, "error": "Conteúdo da versão não encontrado no TXT"}
+            
+            latest = latest_version_raw
+            
+            # Compara as versões
             is_new = self._version_greater(latest, APP_VERSION)
             
             return {
                 "ok": True, 
                 "latest": latest, 
-                "download_url": download, 
+                "download_url": download_url, 
                 "is_new": is_new
             }
+            # --- FIM DA CORREÇÃO ---
             
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 429:
@@ -654,6 +662,7 @@ class UpdateChecker:
 
     @staticmethod
     def _version_greater(a: str, b: str) -> bool:
+        # Este método permanece o mesmo (e está correto para comparar strings de versão)
         try:
             pa = [int(x) for x in (''.join(c for c in a if c.isdigit() or c == '.') or '0').split('.')]
             pb = [int(x) for x in (''.join(c for c in b if c.isdigit() or c == '.') or '0').split('.')]
@@ -824,14 +833,16 @@ class ButtonConfigDialog(ctk.CTkToplevel):
 
     def _on_delete(self):
         """
-        Garante a remoção da referência da imagem e recria o IconLoader para liberar memória.
-        A limpeza visual acontece no refresh_all_buttons recriando o Frame do botão.
+        Garante a remoção da referência da imagem, recria o IconLoader E
+        TENTA DELETAR O ARQUIVO DO ÍCONE DA PASTA ICONS.
         """
-        if not messagebox.askyesno("Excluir", "Deseja remover o programa e o ícone deste botão?"):
+        if not messagebox.askyesno("Excluir", "Deseja remover o programa, o ícone e DELETAR o arquivo do ícone?"):
             return
 
         try:
-            file_to_delete = self.conf.get('icon', '')
+            # Captura o caminho do ícone antes de limpar a configuração
+            icon_path_to_delete = self.conf.get('icon', '')
+            nome_do_botao = self.label_var.get()
             
             # 1. Limpa a configuração do botão no ConfigManager
             self.parent.config.data['buttons'][self.button_key] = {
@@ -851,14 +862,23 @@ class ButtonConfigDialog(ctk.CTkToplevel):
             # 4. Atualiza a interface
             self.parent.refresh_all_buttons()
             
-            # 5. Tenta deletar o arquivo de ícone extraído/temporário
-            if self._newly_created_icon and os.path.exists(self._newly_created_icon):
-                try: 
-                    os.remove(self._newly_created_icon)
-                    self.parent.logger.info(f"Ícone extraído removido: {self._newly_created_icon}")
-                except Exception:
-                    pass
+            # 5. [AQUI ESTÁ A MUDANÇA] Tenta deletar o arquivo do ícone
+            if icon_path_to_delete:
+                abs_path_to_delete = os.path.abspath(icon_path_to_delete)
+                icons_folder_abs = os.path.abspath(ICON_FOLDER)
+                
+                # Regra de segurança: Apenas exclui se o arquivo estiver DENTRO da pasta 'icons'
+                # e se o arquivo existir.
+                if abs_path_to_delete.startswith(icons_folder_abs) and os.path.exists(abs_path_to_delete):
+                    try: 
+                        os.remove(abs_path_to_delete)
+                    except Exception as e:
+                        self.parent.logger.error(f"❌ Erro ao deletar arquivo de ícone: {e}")
+                else:
+                    self.parent.logger.info(f"Ícone não está na pasta 'icons', pulando exclusão do disco: {icon_path_to_delete}")
 
+            self.parent.logger.info(f"🗑️ Botão excluído com sucesso: {nome_do_botao} (ID: {self.button_key})")
+            # 6. Fecha o diálogo
             self.destroy()
             
         except Exception as e:
@@ -958,7 +978,8 @@ class Esp32DeckApp(ctk.CTk):
         atexit.register(self._cleanup_on_exit)
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
-        
+        self.logger.info(f"  💻 Dev: {DEVELOPER}\n")
+        self.logger.info(f"🔗 GitHub: {GITHUB_URL}\n")
     def _reset_icon_loader(self):
         """Destrói e recria o IconLoader para forçar a limpeza total da memória de imagens."""
         size = self.config.data.get('appearance', {}).get('icon_size', ICON_SIZE[0])
@@ -968,7 +989,6 @@ class Esp32DeckApp(ctk.CTk):
             del self.icon_loader 
             
         self.icon_loader = IconLoader(icon_size=(size, size))
-
 
     def _setup_app_icon(self):
         icon_path = get_app_icon_path()
@@ -1131,11 +1151,11 @@ class Esp32DeckApp(ctk.CTk):
         self.tab_settings = self.tabview.add('⚙️ Configurações')
         self.tab_update = self.tabview.add('🔄 Atualização')
         
-        # O _build_buttons_tab inicializa o grid do frame do botão
+        # Container principal dos botões
         self.grid_buttons_parent = ctk.CTkFrame(self.tab_buttons, fg_color="transparent")
         self.grid_buttons_parent.pack(expand=True, fill='both', padx=10, pady=10)
         
-        self._build_buttons_tab(self.grid_buttons_parent) # Passa o container para os frames
+        self._build_buttons_tab(self.grid_buttons_parent) 
 
         self._build_connection_tab(self.tab_connection)
         self._build_settings_tab(self.tab_settings)
@@ -1222,12 +1242,11 @@ class Esp32DeckApp(ctk.CTk):
                 btn_id += 1
                 
     def _create_button_frame(self, parent, key, row, col):
-        """Cria o frame de visualização de um único botão."""
+        """Cria o frame de visualização de um único botão, destruindo o antigo se existir."""
         
         # Se o botão já existe, destrói o frame antigo
         if key in self.button_frames and 'frame' in self.button_frames[key]:
             self.button_frames[key]['frame'].destroy()
-            del self.button_frames[key] # Limpa a entrada para recriar
             
         # 1. Cria o novo Frame do Botão
         btn_frame = ctk.CTkFrame(parent, width=180, height=180, corner_radius=12, border_width=2, border_color=self.colors["secondary"])
@@ -1544,10 +1563,10 @@ class Esp32DeckApp(ctk.CTk):
             for col in range(4):
                 key = str(btn_id)
                 
-                # RECRIA O FRAME DO ZERO
+                # Passo 1: RECRIA O FRAME DO ZERO
                 self._create_button_frame(self.grid_buttons_parent, key, row, col)
                 
-                # Configura o novo frame com as informações atualizadas
+                # Passo 2: Configura o novo frame com as informações atualizadas
                 btn_conf = self.config.data.get('buttons', {}).get(key, {})
                 icon_path = btn_conf.get('icon', '')
                 
@@ -1558,6 +1577,8 @@ class Esp32DeckApp(ctk.CTk):
 
                 # Aplica o ícone ou o placeholder
                 widget_map = self.button_frames[key]
+                widget_map['title_label'].configure(text=btn_conf.get('label', f'Botão {key}'))
+                
                 if ctk_img:
                     widget_map['icon_label'].configure(image=ctk_img, text='')
                     widget_map['icon_label'].image = ctk_img
