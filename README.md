@@ -82,7 +82,7 @@
 
 1. **Baixe o executável:**
 
-   - Acesse [Releases](github.com/KanekiZLF/Stream-Deck-Esp32/releases)
+   - Acesse [Releases](https://github.com/KanekiZLF/Stream-Deck-Esp32/releases)
    - Baixe `Stream-Deck-Esp32.exe`
 
 2. **Execute diretamente:**
