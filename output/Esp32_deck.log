@@ -44,3 +44,447 @@
 --- Starting session Mon Nov 24 15:06:34 2025 ---
 [2025-11-24 15:08:33] [INFO] 🚪 Fechando aplicação...
 [2025-11-24 15:08:33] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 15:59:19 2025 ---
+[2025-11-24 15:59:27] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 15:59:27] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 16:01:54 2025 ---
+[2025-11-24 16:04:02] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: CONNECTED
+[2025-11-24 16:04:02] [DEBUG] 📨 Recebido serial: 🎉 STATUS: Conectado ao software Python
+[2025-11-24 16:04:02] [DEBUG] 📨 Recebido serial: ✅ Conexão estabelecida com software
+[2025-11-24 16:05:44] [INFO] 🔌 Porta serial fechada
+[2025-11-24 16:05:46] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: CONNECTED
+[2025-11-24 16:05:46] [DEBUG] 📨 Recebido serial: 🎉 STATUS: Conectado ao software Python
+[2025-11-24 16:05:46] [DEBUG] 📨 Recebido serial: ✅ Conexão estabelecida com software
+[2025-11-24 16:39:55] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-24 16:39:55] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-24 16:39:55] [DEBUG] Executando ação: open_program
+[2025-11-24 16:39:59] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-24 16:39:59] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-24 16:39:59] [DEBUG] Executando ação: open_program
+[2025-11-24 16:40:00] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-24 16:40:00] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-24 16:40:00] [DEBUG] Executando ação: open_program
+[2025-11-24 16:40:00] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-24 16:40:00] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-24 16:40:00] [DEBUG] Executando ação: open_program
+[2025-11-24 16:40:01] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-24 16:40:01] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-24 16:40:01] [DEBUG] Executando ação: open_program
+[2025-11-24 16:40:02] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-24 16:40:02] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-24 16:40:02] [DEBUG] Executando ação: open_program
+[2025-11-24 16:40:02] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-24 16:40:02] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-24 16:40:02] [DEBUG] Executando ação: open_program
+[2025-11-24 16:40:03] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-24 16:40:03] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-24 16:40:03] [DEBUG] Executando ação: open_program
+[2025-11-24 16:40:11] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-24 16:40:11] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-24 16:40:11] [DEBUG] Executando ação: open_program
+[2025-11-24 16:40:14] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-24 16:40:14] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-24 16:40:14] [DEBUG] Executando ação: open_program
+[2025-11-24 16:40:15] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-24 16:40:15] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-24 16:40:15] [DEBUG] Executando ação: open_program
+[2025-11-24 16:40:16] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-24 16:40:16] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-24 16:40:16] [DEBUG] Executando ação: open_program
+[2025-11-24 16:41:42] [DEBUG] Executando ação: open_program
+[2025-11-24 16:41:42] [ERROR] Arquivo não encontrado: file:Documentos
+[2025-11-24 16:41:48] [DEBUG] Executando ação: open_program
+[2025-11-24 16:41:48] [ERROR] Erro ao listar processos: [WinError 123] A sintaxe do nome do arquivo, do nome do diretório ou do rótulo do volume está incorreta: 'file:///Documentos'
+[2025-11-24 16:41:48] [ERROR] Arquivo não encontrado: file:///Documentos
+[2025-11-24 16:41:48] [DEBUG] Executando ação: open_program
+[2025-11-24 16:41:48] [ERROR] Erro ao listar processos: [WinError 123] A sintaxe do nome do arquivo, do nome do diretório ou do rótulo do volume está incorreta: 'file:///Documentos'
+[2025-11-24 16:41:48] [ERROR] Arquivo não encontrado: file:///Documentos
+[2025-11-24 16:42:01] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:42:01] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:42:01] [DEBUG] Executando ação: open_program
+[2025-11-24 16:42:02] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:42:02] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:42:02] [DEBUG] Executando ação: open_program
+[2025-11-24 16:42:02] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:42:02] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:42:02] [DEBUG] Executando ação: open_program
+[2025-11-24 16:42:12] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:42:12] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:42:12] [DEBUG] Executando ação: open_program
+[2025-11-24 16:42:14] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:42:14] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:42:14] [DEBUG] Executando ação: open_program
+[2025-11-24 16:42:23] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:42:23] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:42:23] [DEBUG] Executando ação: open_program
+[2025-11-24 16:42:54] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:42:54] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:42:54] [DEBUG] Executando ação: open_program
+[2025-11-24 16:43:03] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:43:03] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:43:03] [DEBUG] Executando ação: open_program
+[2025-11-24 16:43:03] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:43:03] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:43:03] [DEBUG] Executando ação: open_program
+[2025-11-24 16:43:04] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:43:04] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:43:04] [DEBUG] Executando ação: open_program
+[2025-11-24 16:43:05] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:43:05] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:43:05] [DEBUG] Executando ação: open_program
+[2025-11-24 16:43:06] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:43:06] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:43:06] [DEBUG] Executando ação: open_program
+[2025-11-24 16:43:07] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:43:07] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:43:07] [DEBUG] Executando ação: open_program
+[2025-11-24 16:43:07] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:43:07] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:43:07] [DEBUG] Executando ação: open_program
+[2025-11-24 16:43:08] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:43:08] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:43:08] [DEBUG] Executando ação: open_program
+[2025-11-24 16:43:50] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 4
+[2025-11-24 16:43:50] [DEBUG] 📨 Recebido serial: BTN:4
+[2025-11-24 16:43:50] [DEBUG] Executando ação: open_program
+[2025-11-24 16:43:59] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 4
+[2025-11-24 16:43:59] [DEBUG] 📨 Recebido serial: BTN:4
+[2025-11-24 16:43:59] [DEBUG] Executando ação: open_program
+[2025-11-24 16:44:01] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 4
+[2025-11-24 16:44:01] [DEBUG] 📨 Recebido serial: BTN:4
+[2025-11-24 16:44:01] [DEBUG] Executando ação: open_program
+[2025-11-24 16:44:15] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 6
+[2025-11-24 16:44:15] [DEBUG] 📨 Recebido serial: BTN:6
+[2025-11-24 16:44:15] [DEBUG] Executando ação: open_program
+[2025-11-24 16:44:17] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 7
+[2025-11-24 16:44:17] [DEBUG] 📨 Recebido serial: BTN:7
+[2025-11-24 16:44:17] [DEBUG] Executando ação: open_program
+[2025-11-24 16:44:22] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 8
+[2025-11-24 16:44:22] [DEBUG] 📨 Recebido serial: BTN:8
+[2025-11-24 16:44:22] [DEBUG] Executando ação: open_program
+[2025-11-24 16:44:30] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:44:30] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:44:30] [DEBUG] Executando ação: open_program
+[2025-11-24 16:44:45] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 6
+[2025-11-24 16:44:45] [DEBUG] 📨 Recebido serial: BTN:6
+[2025-11-24 16:44:45] [DEBUG] Executando ação: open_program
+[2025-11-24 16:44:46] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 7
+[2025-11-24 16:44:46] [DEBUG] 📨 Recebido serial: BTN:7
+[2025-11-24 16:44:46] [DEBUG] Executando ação: open_program
+[2025-11-24 16:44:53] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 7
+[2025-11-24 16:44:53] [DEBUG] 📨 Recebido serial: BTN:7
+[2025-11-24 16:44:53] [DEBUG] Executando ação: open_program
+[2025-11-24 16:46:38] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 4
+[2025-11-24 16:46:38] [DEBUG] 📨 Recebido serial: BTN:4
+[2025-11-24 16:46:38] [DEBUG] Executando ação: open_program
+[2025-11-24 16:46:45] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:46:45] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:46:45] [DEBUG] Executando ação: open_program
+[2025-11-24 16:46:46] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:46:46] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:46:46] [DEBUG] Executando ação: open_program
+[2025-11-24 16:46:46] [ERROR] Erro ao executar ação: [WinError 5] Acesso negado: 'C:/Riot Games/VALORANT/live/VALORANT.exe'
+Traceback (most recent call last):
+  File "Stream-Deck-Esp32.py", line 507, in perform
+  File "Stream-Deck-Esp32.py", line 450, in toggle_application
+  File "Stream-Deck-Esp32.py", line 484, in _start_new
+PermissionError: [WinError 5] Acesso negado: 'C:/Riot Games/VALORANT/live/VALORANT.exe'
+
+[2025-11-24 16:47:01] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:47:01] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:47:01] [DEBUG] Executando ação: open_program
+[2025-11-24 16:47:29] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:47:29] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:47:29] [DEBUG] Executando ação: open_program
+[2025-11-24 16:47:30] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:47:30] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:47:30] [DEBUG] Executando ação: open_program
+[2025-11-24 16:47:46] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 4
+[2025-11-24 16:47:46] [DEBUG] 📨 Recebido serial: BTN:4
+[2025-11-24 16:47:46] [DEBUG] Executando ação: none
+[2025-11-24 16:47:48] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 4
+[2025-11-24 16:47:48] [DEBUG] 📨 Recebido serial: BTN:4
+[2025-11-24 16:47:48] [DEBUG] Executando ação: none
+[2025-11-24 16:47:48] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 4
+[2025-11-24 16:47:48] [DEBUG] 📨 Recebido serial: BTN:4
+[2025-11-24 16:47:48] [DEBUG] Executando ação: none
+[2025-11-24 16:48:04] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 4
+[2025-11-24 16:48:04] [DEBUG] 📨 Recebido serial: BTN:4
+[2025-11-24 16:48:04] [DEBUG] Executando ação: open_program
+[2025-11-24 16:48:09] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 4
+[2025-11-24 16:48:09] [DEBUG] 📨 Recebido serial: BTN:4
+[2025-11-24 16:48:09] [DEBUG] Executando ação: open_program
+[2025-11-24 16:48:30] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 4
+[2025-11-24 16:48:30] [DEBUG] 📨 Recebido serial: BTN:4
+[2025-11-24 16:48:30] [DEBUG] Executando ação: open_program
+[2025-11-24 16:48:35] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:48:35] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:48:35] [DEBUG] Executando ação: open_program
+[2025-11-24 16:48:36] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:48:36] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:48:36] [DEBUG] Executando ação: open_program
+[2025-11-24 16:48:36] [ERROR] Erro ao executar ação: [WinError 5] Acesso negado: 'C:/Riot Games/VALORANT/live/VALORANT.exe'
+Traceback (most recent call last):
+  File "Stream-Deck-Esp32.py", line 507, in perform
+  File "Stream-Deck-Esp32.py", line 450, in toggle_application
+  File "Stream-Deck-Esp32.py", line 484, in _start_new
+PermissionError: [WinError 5] Acesso negado: 'C:/Riot Games/VALORANT/live/VALORANT.exe'
+
+[2025-11-24 16:48:37] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-24 16:48:37] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-24 16:48:37] [DEBUG] Executando ação: open_program
+[2025-11-24 16:48:39] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 5
+[2025-11-24 16:48:39] [DEBUG] 📨 Recebido serial: BTN:5
+[2025-11-24 16:48:39] [DEBUG] Executando ação: none
+[2025-11-24 16:48:39] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 6
+[2025-11-24 16:48:39] [DEBUG] 📨 Recebido serial: BTN:6
+[2025-11-24 16:48:39] [DEBUG] Executando ação: open_program
+[2025-11-24 16:48:40] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 6
+[2025-11-24 16:48:40] [DEBUG] 📨 Recebido serial: BTN:6
+[2025-11-24 16:48:40] [DEBUG] Executando ação: open_program
+[2025-11-24 16:48:41] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 7
+[2025-11-24 16:48:41] [DEBUG] 📨 Recebido serial: BTN:7
+[2025-11-24 16:48:41] [DEBUG] Executando ação: none
+[2025-11-24 16:48:41] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 8
+[2025-11-24 16:48:41] [DEBUG] 📨 Recebido serial: BTN:8
+[2025-11-24 16:48:42] [DEBUG] Executando ação: open_program
+[2025-11-24 16:48:48] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 8
+[2025-11-24 16:48:48] [DEBUG] 📨 Recebido serial: BTN:8
+[2025-11-24 16:48:48] [DEBUG] Executando ação: open_program
+[2025-11-24 16:50:34] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 8
+[2025-11-24 16:50:34] [DEBUG] 📨 Recebido serial: BTN:8
+[2025-11-24 16:50:34] [DEBUG] Executando ação: open_program
+[2025-11-24 16:50:36] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 8
+[2025-11-24 16:50:36] [DEBUG] 📨 Recebido serial: BTN:8
+[2025-11-24 16:50:36] [DEBUG] Executando ação: open_program
+[2025-11-24 16:50:38] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 8
+[2025-11-24 16:50:38] [DEBUG] 📨 Recebido serial: BTN:8
+[2025-11-24 16:50:38] [DEBUG] Executando ação: open_program
+[2025-11-24 16:50:38] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 8
+[2025-11-24 16:50:38] [DEBUG] 📨 Recebido serial: BTN:8
+[2025-11-24 16:50:38] [DEBUG] Executando ação: open_program
+[2025-11-24 16:50:39] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 8
+[2025-11-24 16:50:39] [DEBUG] 📨 Recebido serial: BTN:8
+[2025-11-24 16:50:39] [DEBUG] Executando ação: open_program
+[2025-11-24 16:50:40] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 8
+[2025-11-24 16:50:40] [DEBUG] 📨 Recebido serial: BTN:8
+[2025-11-24 16:50:40] [DEBUG] Executando ação: open_program
+[2025-11-24 16:50:41] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 8
+[2025-11-24 16:50:41] [DEBUG] 📨 Recebido serial: BTN:8
+[2025-11-24 16:50:41] [DEBUG] Executando ação: open_program
+[2025-11-24 16:50:41] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 8
+[2025-11-24 16:50:41] [DEBUG] 📨 Recebido serial: BTN:8
+[2025-11-24 16:50:41] [DEBUG] Executando ação: open_program
+[2025-11-24 16:50:50] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:50:50] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:50:50] [DEBUG] Executando ação: open_program
+[2025-11-24 16:50:51] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:50:51] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:50:51] [DEBUG] Executando ação: open_program
+[2025-11-24 16:50:52] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:50:52] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:50:52] [DEBUG] Executando ação: open_program
+[2025-11-24 16:50:54] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 8
+[2025-11-24 16:50:54] [DEBUG] 📨 Recebido serial: BTN:8
+[2025-11-24 16:50:54] [DEBUG] Executando ação: open_program
+[2025-11-24 16:51:47] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:51:47] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:51:47] [DEBUG] Executando ação: open_program
+[2025-11-24 16:51:48] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:51:48] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:51:48] [DEBUG] Executando ação: open_program
+[2025-11-24 16:51:48] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:51:48] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:51:48] [DEBUG] Executando ação: open_program
+[2025-11-24 16:51:50] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:51:50] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:51:50] [DEBUG] Executando ação: open_program
+[2025-11-24 16:51:50] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:51:50] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:51:50] [DEBUG] Executando ação: open_program
+[2025-11-24 16:51:51] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:51:51] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:51:51] [DEBUG] Executando ação: open_program
+[2025-11-24 16:51:51] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:51:52] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:51:52] [DEBUG] Executando ação: open_program
+[2025-11-24 16:51:52] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:51:52] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:51:52] [DEBUG] Executando ação: open_program
+[2025-11-24 16:51:53] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:51:53] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:51:53] [DEBUG] Executando ação: open_program
+[2025-11-24 16:51:58] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 8
+[2025-11-24 16:51:58] [DEBUG] 📨 Recebido serial: BTN:8
+[2025-11-24 16:51:58] [DEBUG] Executando ação: open_program
+[2025-11-24 16:51:59] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:51:59] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:51:59] [DEBUG] Executando ação: open_program
+[2025-11-24 16:52:00] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:52:00] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:52:00] [DEBUG] Executando ação: open_program
+[2025-11-24 16:52:01] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:52:01] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:52:01] [DEBUG] Executando ação: open_program
+[2025-11-24 16:52:01] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:52:01] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:52:01] [DEBUG] Executando ação: open_program
+[2025-11-24 16:52:03] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 8
+[2025-11-24 16:52:03] [DEBUG] 📨 Recebido serial: BTN:8
+[2025-11-24 16:52:03] [DEBUG] Executando ação: open_program
+[2025-11-24 16:52:04] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:52:04] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:52:04] [DEBUG] Executando ação: open_program
+[2025-11-24 16:52:04] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:52:05] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:52:05] [DEBUG] Executando ação: open_program
+[2025-11-24 16:52:32] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:52:32] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:52:33] [DEBUG] Executando ação: open_program
+[2025-11-24 16:53:14] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-24 16:53:14] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-24 16:53:14] [DEBUG] Executando ação: open_program
+[2025-11-24 16:53:19] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-24 16:53:19] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-24 16:53:19] [DEBUG] Executando ação: open_program
+[2025-11-24 16:53:22] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-24 16:53:22] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-24 16:53:22] [DEBUG] Executando ação: open_program
+[2025-11-24 16:54:02] [DEBUG] Executando ação: open_program
+[2025-11-24 16:54:02] [ERROR] Erro ao listar processos: [WinError 123] A sintaxe do nome do arquivo, do nome do diretório ou do rótulo do volume está incorreta: '"C:\\Program Files (x86)\\Overwolf\\OverwolfLauncher.exe" -launchapp ipmlnnogholfmdmenfijjifldcpjoecappfccceh'
+[2025-11-24 16:54:02] [ERROR] Arquivo não encontrado: "C:\Program Files (x86)\Overwolf\OverwolfLauncher.exe" -launchapp ipmlnnogholfmdmenfijjifldcpjoecappfccceh
+[2025-11-24 16:54:10] [DEBUG] Executando ação: open_program
+[2025-11-24 16:54:10] [ERROR] Arquivo não encontrado: C:\Program Files (x86)\Overwolf\OverwolfLauncher.exe -launchapp ipmlnnogholfmdmenfijjifldcpjoecappfccceh
+[2025-11-24 16:54:49] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 4
+[2025-11-24 16:54:49] [DEBUG] 📨 Recebido serial: BTN:4
+[2025-11-24 16:54:49] [DEBUG] Executando ação: open_program
+
+--- Starting session Mon Nov 24 16:54:55 2025 ---
+[2025-11-24 16:55:03] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 16:55:03] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 16:55:11] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:55:11] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:55:11] [DEBUG] Executando ação: open_program
+[2025-11-24 16:55:11] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:55:11] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:55:11] [DEBUG] Executando ação: open_program
+[2025-11-24 16:55:12] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:55:12] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:55:12] [DEBUG] Executando ação: open_program
+[2025-11-24 16:55:12] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:55:12] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:55:12] [DEBUG] Executando ação: open_program
+[2025-11-24 16:55:13] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:55:13] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:55:13] [DEBUG] Executando ação: open_program
+[2025-11-24 16:55:14] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:55:14] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:55:14] [DEBUG] Executando ação: open_program
+[2025-11-24 16:55:15] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 8
+[2025-11-24 16:55:15] [DEBUG] 📨 Recebido serial: BTN:8
+[2025-11-24 16:55:15] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:05] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:56:05] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:56:05] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:06] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:56:06] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:56:06] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:06] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:56:06] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:56:06] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:07] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:56:07] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:56:07] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:09] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:56:09] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:56:09] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:09] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:56:09] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:56:09] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:10] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:56:10] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:56:10] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:11] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:56:11] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:56:11] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:12] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:56:12] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:56:12] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:13] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:56:13] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:56:13] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:13] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:56:13] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:56:13] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:14] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:56:14] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:56:14] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:15] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:56:15] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:56:15] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:24] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 8
+[2025-11-24 16:56:24] [DEBUG] 📨 Recebido serial: BTN:8
+[2025-11-24 16:56:25] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:26] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 8
+[2025-11-24 16:56:26] [DEBUG] 📨 Recebido serial: BTN:8
+[2025-11-24 16:56:26] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:27] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:56:27] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:56:27] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:28] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:56:28] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:56:28] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:29] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:56:29] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:56:29] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:30] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-24 16:56:30] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-24 16:56:30] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:31] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 2
+[2025-11-24 16:56:31] [DEBUG] 📨 Recebido serial: BTN:2
+[2025-11-24 16:56:31] [DEBUG] Executando ação: open_program
+[2025-11-24 16:56:31] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 8
+[2025-11-24 16:56:31] [DEBUG] 📨 Recebido serial: BTN:8
+[2025-11-24 16:56:31] [DEBUG] Executando ação: open_program
+[2025-11-24 16:58:12] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 16:58:12] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: DISCONNECT
+[2025-11-24 16:58:13] [INFO] 🔌 Porta serial fechada
+[2025-11-24 16:58:13] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Mon Nov 24 22:28:48 2025 ---
+[2025-11-24 22:28:59] [ERROR] Falha na atualização: Muitas tentativas (429). Aguarde alguns minutos.
+[2025-11-24 22:29:08] [ERROR] Falha na atualização: Muitas tentativas (429). Aguarde alguns minutos.
+[2025-11-24 22:29:29] [INFO] 🚪 Fechando aplicação...
+[2025-11-24 22:29:29] [INFO] 🚪 Fechando aplicação...
+
+--- Starting session Tue Nov 25 20:39:51 2025 ---
+[2025-11-25 20:40:39] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: CONNECTED
+[2025-11-25 20:40:39] [DEBUG] 📨 Recebido serial: 🎉 STATUS: Conectado ao software Python
+[2025-11-25 20:40:39] [DEBUG] 📨 Recebido serial: ✅ Conexão estabelecida com software
+[2025-11-25 20:40:41] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 3
+[2025-11-25 20:40:41] [DEBUG] 📨 Recebido serial: BTN:3
+[2025-11-25 20:40:41] [DEBUG] Executando ação: open_program
+[2025-11-25 20:46:13] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-25 20:46:13] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-25 20:46:13] [DEBUG] Executando ação: open_program
+[2025-11-25 20:46:30] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-25 20:46:30] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-25 20:46:30] [DEBUG] Executando ação: open_program
+[2025-11-25 20:46:51] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-25 20:46:51] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-25 20:46:51] [DEBUG] Executando ação: open_program
+[2025-11-25 20:46:57] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-25 20:46:57] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-25 20:46:57] [DEBUG] Executando ação: open_program
+[2025-11-25 20:53:10] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-25 20:53:10] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-25 20:53:10] [DEBUG] Executando ação: open_program
+[2025-11-25 21:03:44] [DEBUG] 📨 Recebido serial: 🎮 BOTÃO PRESSIONADO: 1
+[2025-11-25 21:03:44] [DEBUG] 📨 Recebido serial: BTN:1
+[2025-11-25 21:03:44] [DEBUG] Executando ação: open_program
+[2025-11-25 22:25:29] [INFO] 🚪 Fechando aplicação...
+[2025-11-25 22:25:29] [DEBUG] 📨 Recebido serial: 📨 Comando recebido: DISCONNECT
+[2025-11-25 22:25:29] [INFO] 🔌 Porta serial fechada
+[2025-11-25 22:25:29] [INFO] 🚪 Fechando aplicação...

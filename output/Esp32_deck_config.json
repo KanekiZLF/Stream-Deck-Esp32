@@ -2,27 +2,27 @@
     "version": "1.5.12",
     "buttons": {
         "1": {
-            "label": "Botão 1",
-            "icon": "",
+            "label": "OperaGX",
+            "icon": "icons\\btn1_opera.png",
             "action": {
-                "type": "none",
-                "payload": ""
+                "type": "open_program",
+                "payload": "C:/Users/Luiz Fernando/AppData/Local/Programs/Opera GX/opera.exe"
             }
         },
         "2": {
             "label": "Botão 2",
-            "icon": "",
+            "icon": "icons\\btn2_Code.png",
             "action": {
-                "type": "none",
-                "payload": ""
+                "type": "open_program",
+                "payload": "C:/Users/Luiz Fernando/AppData/Local/Programs/Microsoft VS Code/Code.exe"
             }
         },
         "3": {
-            "label": "Botão 3",
-            "icon": "",
+            "label": "CorelDraw",
+            "icon": "icons\\btn3_CorelDRW.png",
             "action": {
-                "type": "none",
-                "payload": ""
+                "type": "open_program",
+                "payload": "C:/Program Files/Corel/CorelDRAW Technical Suite/26/Programs64/CorelDRW.exe"
             }
         },
         "4": {
@@ -58,11 +58,11 @@
             }
         },
         "8": {
-            "label": "Botão 8",
-            "icon": "",
+            "label": "Gerenciador Taf",
+            "icon": "icons\\btn8_Taskmgr.png",
             "action": {
-                "type": "none",
-                "payload": ""
+                "type": "open_program",
+                "payload": "C:/Windows/System32/Taskmgr.exe"
             }
         }
     },

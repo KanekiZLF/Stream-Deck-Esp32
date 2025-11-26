@@ -25,7 +25,7 @@ except ImportError:
 # GUI libs
 import customtkinter as ctk
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, simpledialog 
 from PIL import Image, ImageTk, ImageDraw
 
 # Serial
@@ -35,6 +35,7 @@ import serial.tools.list_ports
 # -----------------------------
 # OPTIONAL IMPORTS CHECK
 # -----------------------------
+# Para Toggle/Focar Janelas e System Tray
 try:
     import requests
     REQUESTS_AVAILABLE = True
@@ -66,7 +67,7 @@ except ImportError:
 CONFIG_FILE = "Esp32_deck_config.json"
 ICON_FOLDER = "icons"
 LOG_FILE = "Esp32_deck.log"
-APP_VERSION = "1.5.12" # Versão: Correção da Exclusão do Arquivo de Ícone
+APP_VERSION = "1.5.17" # Versão: Correção de Foco ao Mudar Tipo de Ação
 APP_NAME = "Esp32 Deck Controller"
 APP_ICON_NAME = "app_icon.ico"
 DEVELOPER = "Luiz F. R. Pimentel"
@@ -75,6 +76,19 @@ UPDATE_CHECK_URL = "https://raw.githubusercontent.com/KanekiZLF/Stream-Deck-Esp3
 DEFAULT_SERIAL_BAUD = 115200
 BUTTON_COUNT = 8
 ICON_SIZE = (64, 64)
+
+# Tipos de Ação e seus nomes amigáveis para a UI
+ACTION_TYPES = {
+    "none": "Nenhuma Ação",
+    "open_program": "Abrir Programa / Executável",
+    "open_url": "Abrir URL",
+    "run_cmd": "Executar Comando Shell",
+    "type_text": "Digitar Texto",
+    "hotkey": "Tecla de Atalho (Hotkey)",
+    "script": "Executar Script Python (.py)",
+    "macro": "Macro (Ações Sequenciais)",
+}
+ACTION_TYPES_REVERSE = {v: k for k, v in ACTION_TYPES.items()}
 
 # Ensure icons folder exists
 os.makedirs(ICON_FOLDER, exist_ok=True)
@@ -101,7 +115,7 @@ def safe_makedirs(path: str):
         pass
 
 # -----------------------------
-# Icon Path
+# Icon Path (POSICIONADO APÓS AS CONSTANTES)
 # -----------------------------
 def get_app_icon_path() -> str:
     """Retorna o caminho absoluto para o ícone da aplicação, tratando o ambiente PyInstaller."""
@@ -150,7 +164,8 @@ class Logger:
         elif "Fechando aplicação" in msg or "Porta serial fechada" in msg:
             should_save = True
         
-        if should_save or level == "DEBUG":
+        # Otimização: Apenas salva log crítico e informações de sessão/serial
+        if should_save or level == "ERROR" or "Fechando aplicação" in msg or "Porta serial fechada" in msg:
             self._write_file(entry)
             
         if self.textbox:
@@ -198,29 +213,34 @@ class ConfigManager:
                 "theme": "System", 
                 "icon_size": ICON_SIZE[0],
                 "minimize_to_tray": False,
-                "font_size": "Médio"
+                "font_size": "Médio",
+                "color_scheme": "Padrão" # Adicionando default color scheme
             },
             "update": {"check_url": UPDATE_CHECK_URL}
         }
 
     def _load_or_create(self):
+        default_config = self._default()
         if os.path.exists(self.path):
             try:
                 with open(self.path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
+                
+                # Otimização: Garantir que chaves importantes existam (migração/compatibilidade)
                 if 'buttons' not in data:
-                    data = self._default()
+                    data['buttons'] = default_config['buttons']
                 if 'appearance' not in data:
-                    data['appearance'] = self._default()['appearance']
-                if 'minimize_to_tray' not in data['appearance']:
-                    data['appearance']['minimize_to_tray'] = False
-                if 'font_size' not in data['appearance']:
-                    data['appearance']['font_size'] = "Médio"
+                    data['appearance'] = default_config['appearance']
+                # Sub-chaves de appearance
+                for key, default_val in default_config['appearance'].items():
+                    if key not in data['appearance']:
+                        data['appearance'][key] = default_val
+                
                 return data
             except Exception:
-                return self._default()
+                return default_config
         else:
-            return self._default()
+            return default_config
 
     def save(self):
         try:
@@ -277,6 +297,7 @@ class IconLoader:
         try:
             import gc
             gc.collect() 
+            # Otimização: Tenta fechar objetos PIL não referenciados explicitamente
             for obj in gc.get_objects():
                 if isinstance(obj, Image.Image):
                     try:
@@ -303,6 +324,7 @@ class IconLoader:
             return None
 
     def try_load_windows_exe_icon(self, exe_path: str) -> Optional[ctk.CTkImage]:
+        # Tenta carregar ícone .ico com o mesmo nome
         ico_candidate = os.path.splitext(exe_path)[0] + '.ico'
         if os.path.exists(ico_candidate):
             return self.load_icon_from_path(ico_candidate)
@@ -348,6 +370,7 @@ class IconLoader:
 # Tray Icon Manager
 # -----------------------------
 class TrayIconManager:
+    # ... (TrayIconManager code is unchanged and remains correct)
     def __init__(self, app_reference, logger: Logger):
         self.app = app_reference
         self.logger = logger
@@ -402,10 +425,12 @@ class TrayIconManager:
         if self.icon:
             self.icon.stop()
             self.running = False
+            
 # -----------------------------
 # Window Manager
 # -----------------------------
 class WindowManager:
+    # ... (WindowManager code is unchanged and remains correct)
     def __init__(self, logger: Logger):
         self.logger = logger
         
@@ -431,6 +456,7 @@ class WindowManager:
         target_hwnds = []
 
         try:
+            # Correção para lidar com scripts Python: verifica por caminho completo ou nome
             for proc in psutil.process_iter(['name', 'exe', 'pid']):
                 try:
                     if proc.info['exe'] and os.path.samefile(proc.info['exe'], exe_path):
@@ -502,39 +528,738 @@ class ActionManager:
 
     def perform(self, action: Action):
         try:
+            if action.type == 'none': return # Não faz nada
+            
             self.logger.debug(f"Executando ação: {action.type}")
+            
             if action.type == 'open_program':
+                # O open_program agora faz o 'toggle' no Windows
                 self.window_manager.toggle_application(action.payload)
             elif action.type == 'open_url':
                 webbrowser.open(action.payload)
                 self.logger.info(f'Abrindo URL: {action.payload}')
             elif action.type == 'run_cmd':
-                subprocess.Popen(action.payload, shell=True)
-                self.logger.info(f'Rodando comando: {action.payload}')
+                # Executa o comando em um shell separado para não bloquear
+                subprocess.Popen(action.payload, shell=True) 
+                self.logger.info(f'Rodando comando Shell: {action.payload}')
             elif action.type == 'type_text':
                 if PYAUTOGUI_AVAILABLE:
                     pyautogui.write(action.payload)
                     self.logger.info('Texto digitado via pyautogui')
+                else:
+                    self.logger.warn('pyautogui não disponível para digitar texto.')
             elif action.type == 'hotkey':
                 if PYAUTOGUI_AVAILABLE:
-                    keys = action.payload if isinstance(action.payload, list) else [action.payload]
+                    # O payload pode ser uma string (Ex: 'ctrl+a') ou lista (Ex: ['ctrl', 'alt', 'del'])
+                    keys = action.payload if isinstance(action.payload, list) else action.payload.split('+')
                     pyautogui.hotkey(*keys)
                     self.logger.info(f'Hotkey enviada: {keys}')
+                else:
+                    self.logger.warn('pyautogui não disponível para hotkey.')
             elif action.type == 'script':
+                # Executa um script Python (.py)
                 if os.path.exists(action.payload):
-                    subprocess.Popen([sys.executable, action.payload])
+                    # Inicia o script Python com o interpretador atual
+                    subprocess.Popen([sys.executable, action.payload]) 
+                else:
+                    self.logger.error(f'Script não encontrado: {action.payload}')
             elif action.type == 'macro':
-                for a in action.payload:
-                    sub = Action(a.get('type'), a.get('payload'))
-                    self.perform(sub)
-                    time.sleep(0.1)
+                # Macro: Sequência de sub-ações
+                if isinstance(action.payload, list):
+                    self.logger.info(f'Iniciando Macro de {len(action.payload)} passos.')
+                    for i, a in enumerate(action.payload):
+                        # Garantir que cada elemento da macro é um dicionário Action válido
+                        if isinstance(a, dict) and 'type' in a:
+                            sub = Action(a.get('type'), a.get('payload', ''))
+                            self.perform(sub)
+                            # Pequeno delay entre ações para estabilidade
+                            time.sleep(0.1) 
+                        else:
+                            self.logger.error(f'Erro no passo {i+1} da macro: Estrutura inválida.')
+                else:
+                    self.logger.error('Macro com payload inválido (não é uma lista).')
+                    
         except Exception as e:
             self.logger.error(f'Erro ao executar ação: {e}\n{traceback.format_exc()}')
+
+
+# -----------------------------
+# Dialogs (Sub Action Config)
+# -----------------------------
+class SubActionConfigDialog(ctk.CTkToplevel):
+    """Novo diálogo CustomTkinter para configurar uma única ação dentro de uma macro."""
+    def __init__(self, parent, initial_type: str, initial_payload: Any, logger: Logger):
+        super().__init__(parent)
+        self.parent = parent
+        self.logger = logger
+        self.title("Configurar Ação da Macro")
+        self.geometry("400x250")
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+        self._center_window()
+        
+        self.result: Optional[Dict[str, Any]] = None
+        self.action_type_var = tk.StringVar(value=ACTION_TYPES.get(initial_type, ACTION_TYPES['open_program']))
+        self.initial_payload = initial_payload
+        
+        self._build_ui()
+        
+        # Correção de foco: Forçar a janela a ficar na frente
+        self.lift()
+        
+    def _center_window(self):
+        self.update_idletasks()
+        # Garante que a janela abre centralizada em relação à tela ou ao parent.
+        # Aqui, centralizamos em relação ao parent (MacroEditorDialog).
+        parent_x = self.parent.winfo_x()
+        parent_y = self.parent.winfo_y()
+        parent_w = self.parent.winfo_width()
+        parent_h = self.parent.winfo_height()
+        
+        x = parent_x + (parent_w // 2) - (400 // 2)
+        y = parent_y + (parent_h // 2) - (250 // 2)
+        
+        self.geometry(f'+{x}+{y}')
+
+    def _build_ui(self):
+        main_frame = ctk.CTkFrame(self, fg_color="transparent")
+        main_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        # Tipo de Ação
+        ctk.CTkLabel(main_frame, text='Tipo de Ação:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', pady=(0, 5))
+        
+        self.action_type_menu = ctk.CTkOptionMenu(
+            main_frame, 
+            values=[v for k, v in ACTION_TYPES.items() if k != 'macro'], # Macros não podem conter macros
+            variable=self.action_type_var,
+            command=self._on_type_change,
+            height=35
+        )
+        self.action_type_menu.pack(fill='x', pady=(0, 10))
+        
+        # Payload
+        self.payload_label = ctk.CTkLabel(main_frame, text='Payload (Valor / Caminho):', font=ctk.CTkFont(weight="bold"))
+        self.payload_label.pack(anchor='w', pady=(5, 5))
+        
+        self.payload_entry = ctk.CTkEntry(main_frame, height=35)
+        self.payload_entry.pack(fill='x', pady=(0, 15))
+        
+        # Preenche com o valor inicial
+        if isinstance(self.initial_payload, (dict, list)):
+            try:
+                # Hotkey/Macro payload pode ser complexo, tenta serializar se aplicável
+                val = json.dumps(self.initial_payload, ensure_ascii=False)
+            except:
+                 val = str(self.initial_payload)
+        else:
+            val = str(self.initial_payload)
+            
+        self.payload_entry.insert(0, val)
+        self.payload_entry.bind("<FocusIn>", self._on_focus_in) # Garante que o texto seja tratado como valor
+
+        self._on_type_change(self.action_type_var.get())
+        
+        # Botões
+        btn_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        btn_frame.pack(side='bottom', fill='x')
+        
+        # Botões centralizados
+        inner_buttons_frame = ctk.CTkFrame(btn_frame, fg_color="transparent")
+        inner_buttons_frame.pack(expand=True, padx=5)
+        
+        ctk.CTkButton(inner_buttons_frame, text='🚫 Cancelar', command=self.destroy, fg_color="#6c757d").pack(side='right', padx=(10, 0))
+        ctk.CTkButton(inner_buttons_frame, text='💾 Salvar Ação', command=self._save_action, fg_color=COLORS["success"]).pack(side='right')
+
+    def _on_focus_in(self, event):
+        # Apenas garante que a janela permaneça em foco
+        self.lift()
+
+    def _on_type_change(self, friendly_type: str):
+        selected_type = ACTION_TYPES_REVERSE.get(friendly_type, 'none')
+        
+        # Dicas de placeholder
+        placeholders = {
+            'open_program': 'Ex: C:\\Program Files\\app.exe',
+            'open_url': 'Ex: https://google.com',
+            'run_cmd': 'Ex: start explorer',
+            'type_text': 'O texto será digitado na janela ativa.',
+            'hotkey': 'Ex: ctrl+c ou ["ctrl", "alt", "f1"]',
+            'script': 'Ex: C:\\Scripts\\meu_script.py',
+            'none': ''
+        }
+        
+        # Define o placeholder_text
+        self.payload_entry.configure(placeholder_text=placeholders.get(selected_type, ''))
+        
+        # 💡 CORREÇÃO APLICADA AQUI: Retira o foco do campo de texto
+        self.focus()
+
+    def _save_action(self):
+        raw_payload = self.payload_entry.get().strip()
+        selected_type = ACTION_TYPES_REVERSE.get(self.action_type_var.get(), 'none')
+        payload = raw_payload
+        
+        if selected_type in ['hotkey']:
+            try:
+                # Tenta desserializar o payload como JSON (lista de teclas)
+                payload = json.loads(raw_payload)
+            except json.JSONDecodeError:
+                 if raw_payload:
+                    payload = raw_payload
+                 else:
+                     payload = []
+        
+        self.result = {'type': selected_type, 'payload': payload}
+        self.destroy()
+
+# -----------------------------
+# Dialogs (Macro Editor)
+# -----------------------------
+class MacroEditorDialog(ctk.CTkToplevel):
+    def __init__(self, parent, initial_macro: List[Dict[str, Any]], logger: Logger):
+        super().__init__(parent)
+        self.logger = logger
+        self.title("Editor de Macro")
+        self.geometry("600x500")
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+        
+        self._center_window()
+        
+        # A macro é uma lista de dicionários de ação (type, payload)
+        self.macro_list = initial_macro or [] 
+        self.result = None
+        
+        self._build_ui()
+        self._populate_list()
+        
+        # Correção de Foco: Levanta a janela para garantir que não vá para trás
+        self.lift() 
+        
+    def _center_window(self):
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() // 2) - (self.winfo_width() // 2)
+        y = (self.winfo_screenheight() // 2) - (self.winfo_height() // 2)
+        self.geometry(f'+{x}+{y}')
+
+    def _build_ui(self):
+        # Frame de Listagem
+        list_frame = ctk.CTkFrame(self, corner_radius=8)
+        list_frame.pack(fill='both', expand=True, padx=15, pady=(15, 5))
+        
+        ctk.CTkLabel(list_frame, text="Sequência de Ações (Executada em Ordem)", font=ctk.CTkFont(weight="bold")).pack(anchor='w', padx=10, pady=(10, 5))
+
+        # 💡 CORREÇÃO APLICADA: Substituir get_appearance_mode_color
+        # Determina as cores com base no modo de aparência atual
+        if ctk.get_appearance_mode().lower() in ["dark", "system"]:
+            bg_color = "#343638"  # Fundo escuro (CTK Dark BG)
+            fg_color = "white"    # Texto claro
+        else:
+            bg_color = "white"    # Fundo claro
+            fg_color = "black"    # Texto escuro
+
+        self.listbox = tk.Listbox(
+            list_frame, 
+            height=15, 
+            background=bg_color,
+            foreground=fg_color,
+            selectbackground=COLORS["secondary"],
+            selectforeground="white",
+            font=("Arial", 12),
+            bd=0,
+            highlightthickness=0 
+        )
+        self.listbox.pack(fill='both', expand=True, padx=10, pady=(0, 10))
+        self.listbox.bind('<<ListboxSelect>>', self._on_select)
+        
+        # Frame de Ações (Adicionar, Editar, Mover)
+        action_frame = ctk.CTkFrame(self, fg_color="transparent")
+        action_frame.pack(fill='x', padx=15, pady=(5, 15))
+        
+        # Botões de controle da lista centralizados
+        control_buttons_frame = ctk.CTkFrame(action_frame, fg_color="transparent")
+        control_buttons_frame.pack(expand=True)
+        
+        self.add_btn = ctk.CTkButton(control_buttons_frame, text="➕ Adicionar", command=lambda: self._edit_action(), fg_color=COLORS["success"])
+        self.add_btn.pack(side='left', padx=(0, 5))
+        
+        self.edit_btn = ctk.CTkButton(control_buttons_frame, text="✏️ Editar", command=lambda: self._edit_action(selected=True), state='disabled', fg_color=COLORS["primary"])
+        self.edit_btn.pack(side='left', padx=5)
+        
+        self.remove_btn = ctk.CTkButton(control_buttons_frame, text="🗑️ Remover", command=self._remove_action, state='disabled', fg_color=COLORS["danger"])
+        self.remove_btn.pack(side='left', padx=5)
+        
+        self.up_btn = ctk.CTkButton(control_buttons_frame, text="▲", command=lambda: self._move_action(-1), state='disabled', width=30)
+        self.up_btn.pack(side='left', padx=(10, 2))
+
+        self.down_btn = ctk.CTkButton(control_buttons_frame, text="▼", command=lambda: self._move_action(1), state='disabled', width=30)
+        self.down_btn.pack(side='left')
+        
+        # Frame de Salvar/Cancelar (também centralizado)
+        save_frame = ctk.CTkFrame(self, fg_color="transparent")
+        save_frame.pack(fill='x', padx=15, pady=(0, 15))
+
+        inner_save_buttons_frame = ctk.CTkFrame(save_frame, fg_color="transparent")
+        inner_save_buttons_frame.pack(expand=True)
+        
+        ctk.CTkButton(inner_save_buttons_frame, text="🚫 Cancelar", command=self.destroy, fg_color="#6c757d").pack(side='left', padx=(10, 0))
+        ctk.CTkButton(inner_save_buttons_frame, text="💾 Salvar Macro", command=self._save_and_close, fg_color=COLORS["success"]).pack(side='left')
+
+    def _populate_list(self):
+        self.listbox.delete(0, tk.END)
+        for action in self.macro_list:
+            action_type = action.get('type', 'none')
+            payload = action.get('payload', '')
+            display_type = ACTION_TYPES.get(action_type, action_type)
+            
+            # Formatação de exibição
+            display_payload = str(payload)
+            if action_type in ['hotkey']:
+                display_payload = json.dumps(payload)
+            elif len(display_payload) > 40:
+                display_payload = display_payload[:37] + "..."
+                
+            entry = f"{display_type}: {display_payload}"
+            self.listbox.insert(tk.END, entry)
+            
+        self._on_select() # Atualiza o estado dos botões
+
+    def _on_select(self, event=None):
+        selected_indices = self.listbox.curselection()
+        if selected_indices:
+            idx = selected_indices[0]
+            self.edit_btn.configure(state='normal')
+            self.remove_btn.configure(state='normal')
+            self.up_btn.configure(state='normal' if idx > 0 else 'disabled')
+            self.down_btn.configure(state='normal' if idx < len(self.macro_list) - 1 else 'disabled')
+        else:
+            self.edit_btn.configure(state='disabled')
+            self.remove_btn.configure(state='disabled')
+            self.up_btn.configure(state='disabled')
+            self.down_btn.configure(state='disabled')
+            
+    def _edit_action(self, selected=False):
+        
+        index = self.listbox.curselection()[0] if selected else None
+        
+        initial_type = "open_program"
+        initial_payload = ""
+        
+        if index is not None:
+            initial_type = self.macro_list[index].get('type', 'none')
+            initial_payload = self.macro_list[index].get('payload', '')
+        
+        # 💡 CORREÇÃO APLICADA: Usa o novo SubActionConfigDialog (CTkToplevel)
+        dlg = SubActionConfigDialog(self, initial_type, initial_payload, self.logger)
+        self.wait_window(dlg)
+        
+        if dlg.result:
+            new_action = dlg.result
+            if index is not None:
+                self.macro_list[index] = new_action
+            else:
+                self.macro_list.append(new_action)
+            
+            self._populate_list()
+        
+    def _remove_action(self):
+        selected_indices = self.listbox.curselection()
+        if selected_indices:
+            idx = selected_indices[0]
+            del self.macro_list[idx]
+            self._populate_list()
+
+    def _move_action(self, direction: int):
+        selected_indices = self.listbox.curselection()
+        if selected_indices:
+            idx = selected_indices[0]
+            new_idx = idx + direction
+            if 0 <= new_idx < len(self.macro_list):
+                # Troca os itens na lista
+                self.macro_list[idx], self.macro_list[new_idx] = self.macro_list[new_idx], self.macro_list[idx]
+                self._populate_list()
+                # Mantém o item selecionado
+                self.listbox.select_clear(0, tk.END)
+                self.listbox.select_set(new_idx)
+                self.listbox.event_generate("<<ListboxSelect>>")
+
+    def _save_and_close(self):
+        self.result = self.macro_list
+        self.destroy()
+
+# -----------------------------
+# Dialogs (Button Config)
+# -----------------------------
+class ButtonConfigDialog(ctk.CTkToplevel):
+    def __init__(self, parent: Esp32DeckApp, button_key: str, conf: Dict[str, Any], icon_loader: IconLoader, logger: Logger):
+        super().__init__(parent)
+        self.parent = parent
+        self.button_key = button_key
+        self.conf = conf
+        self.icon_loader = icon_loader
+        self.logger = logger
+        self._newly_created_icon = None
+        self.title(f'Configurar Botão {button_key}')
+        self.geometry('550x500') # Aumentado para acomodar o menu de ação
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+        self._center_window()
+        self.protocol("WM_DELETE_WINDOW", self._on_cancel)
+        
+        self.label_var = tk.StringVar(value=self.conf.get('label', f'Botão {button_key}'))
+        self.icon_path = self.conf.get('icon', '')
+        self._initial_action_type = self.conf.get('action', {}).get('type', 'none')
+        self._initial_payload = self.conf.get('action', {}).get('payload', '')
+        
+        self._build()
+        
+        # Correção de foco: Forçar a janela a ficar na frente
+        self.lift() 
+        
+    def _center_window(self):
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() // 2) - (self.winfo_width() // 2)
+        y = (self.winfo_screenheight() // 2) - (self.winfo_height() // 2)
+        self.geometry(f'+{x}+{y}')
+        
+    def _build(self):
+        main_frame = ctk.CTkFrame(self, corner_radius=10)
+        main_frame.pack(fill='both', expand=True, padx=15, pady=15)
+        
+        # Nome do Botão
+        ctk.CTkLabel(main_frame, text='Nome do Botão:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', pady=(5, 0), padx=5)
+        def on_name_change(*args):
+            if len(self.label_var.get()) > 16: self.label_var.set(self.label_var.get()[:16])
+        self.label_var.trace('w', on_name_change)
+        ctk.CTkEntry(main_frame, textvariable=self.label_var, width=400, placeholder_text="Máximo 16 caracteres").pack(fill='x', pady=5, padx=5)
+        
+        # Ícone e Programa (Frame)
+        icon_frame = ctk.CTkFrame(main_frame, corner_radius=8, border_width=1, border_color="#555")
+        icon_frame.pack(fill='x', pady=(10, 5))
+        ctk.CTkLabel(icon_frame, text='Ícone e Programa:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', padx=10, pady=(10, 5))
+        
+        icon_content = ctk.CTkFrame(icon_frame, fg_color="transparent")
+        icon_content.pack(fill='x', padx=10, pady=(0, 10))
+        
+        self.icon_preview = ctk.CTkLabel(icon_content, text='📱', width=64, height=64, font=ctk.CTkFont(size=20), text_color=COLORS["primary"])
+        self.icon_preview.pack(side='left', padx=10)
+        
+        btn_frame = ctk.CTkFrame(icon_content, fg_color="transparent")
+        btn_frame.pack(side='left', padx=10)
+        ctk.CTkButton(btn_frame, text='Escolher Ícone', width=140, command=self._choose_icon).pack(side='top', padx=5, pady=(0, 5))
+        
+        # Ação (Tipo e Payload)
+        action_frame = ctk.CTkFrame(main_frame, corner_radius=8)
+        action_frame.pack(fill='x', pady=5)
+        
+        # Tipo de Ação
+        ctk.CTkLabel(action_frame, text='Tipo de Ação:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', padx=10, pady=(10, 5))
+        
+        type_options = list(ACTION_TYPES.values())
+        self.action_type_menu = ctk.CTkOptionMenu(
+            action_frame, 
+            values=type_options, 
+            command=self._on_action_type_change,
+            height=35
+        )
+        self.action_type_menu.pack(fill='x', padx=10, pady=(0, 5))
+        
+        friendly_type = ACTION_TYPES.get(self._initial_action_type, ACTION_TYPES['open_program'])
+        self.action_type_menu.set(friendly_type)
+        
+        # Payload / Botão de Seleção
+        self.payload_label = ctk.CTkLabel(action_frame, text='Comando / Caminho:', font=ctk.CTkFont(weight="bold"))
+        self.payload_label.pack(anchor='w', padx=10, pady=(5, 5))
+        
+        payload_input_frame = ctk.CTkFrame(action_frame, fg_color="transparent")
+        payload_input_frame.pack(fill='x', padx=10, pady=(0, 10))
+        
+        self.payload_entry = ctk.CTkEntry(payload_input_frame, height=35)
+        self.payload_entry.pack(side='left', fill='x', expand=True, padx=(0, 5))
+        
+        self.select_btn = ctk.CTkButton(payload_input_frame, text="...", width=40, command=self._select_file_or_macro)
+        self.select_btn.pack(side='right')
+
+        # Popula o payload inicial
+        try:
+            val = json.dumps(self._initial_payload, ensure_ascii=False) if isinstance(self._initial_payload, (dict, list)) else str(self._initial_payload)
+            self.payload_entry.insert(0, val)
+        except: self.payload_entry.insert(0, str(self._initial_payload))
+        
+        # Chama o handler para configurar os widgets baseados na ação inicial
+        self._on_action_type_change(friendly_type)
+        
+        # Botões de Ação
+        buttons_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        buttons_frame.pack(fill='x', pady=10)
+        inner_buttons_frame = ctk.CTkFrame(buttons_frame, fg_color="transparent")
+        inner_buttons_frame.pack(expand=True)
+        
+        ctk.CTkButton(inner_buttons_frame, text='▶️ Testar', command=self._test_action, fg_color=COLORS["primary"], width=80).pack(side='left', padx=5)
+        ctk.CTkButton(inner_buttons_frame, text='🗑️ Excluir', command=self._on_delete, fg_color=COLORS["danger"], width=80).pack(side='left', padx=5)
+        ctk.CTkButton(inner_buttons_frame, text='🚫 Cancelar', command=self._on_cancel, fg_color="#6c757d", width=80).pack(side='left', padx=5)
+        ctk.CTkButton(inner_buttons_frame, text='💾 Salvar', command=self._save_and_close, fg_color=COLORS["success"], width=80).pack(side='left', padx=5)
+        
+        self._refresh_icon_preview()
+
+    def _on_action_type_change(self, friendly_type: str):
+        selected_type = ACTION_TYPES_REVERSE.get(friendly_type, 'none')
+        
+        # 1. Limpa o campo para garantir que o placeholder correto apareça
+        self.payload_entry.delete(0, 'end')
+        
+        # 2. Se o novo tipo for o mesmo que o tipo inicial, restaura o payload.
+        # Caso contrário, o campo fica vazio (e exibe o placeholder).
+        if self._initial_action_type == selected_type:
+             try:
+                 val = json.dumps(self._initial_payload, ensure_ascii=False) if isinstance(self._initial_payload, (dict, list)) else str(self._initial_payload)
+                 if str(val).strip(): # Apenas insere se for um valor real (não vazio)
+                    self.payload_entry.insert(0, val)
+             except:
+                 self.payload_entry.insert(0, str(self._initial_payload))
+
+        if selected_type == 'none':
+            self.payload_label.configure(text='Nenhuma ação configurada')
+            self.payload_entry.configure(placeholder_text="", state='disabled')
+            self.select_btn.configure(text="...", state='disabled')
+        elif selected_type == 'open_program':
+            self.payload_label.configure(text='Caminho do Executável (.exe):')
+            self.payload_entry.configure(placeholder_text="Ex: C:\\Program Files\\app.exe", state='normal')
+            self.select_btn.configure(text="...", state='normal', command=lambda: self._select_file_or_macro('open_program'))
+        elif selected_type == 'open_url':
+            self.payload_label.configure(text='URL (Link Web):')
+            self.payload_entry.configure(placeholder_text="Ex: https://google.com", state='normal')
+            self.select_btn.configure(text="...", state='disabled')
+        elif selected_type == 'run_cmd':
+            self.payload_label.configure(text='Comando Shell:')
+            self.payload_entry.configure(placeholder_text="Ex: start explorer", state='normal')
+            self.select_btn.configure(text="...", state='disabled')
+        elif selected_type == 'type_text':
+            self.payload_label.configure(text='Texto para Digitar:')
+            self.payload_entry.configure(placeholder_text="O texto será digitado na janela ativa.", state='normal')
+            self.select_btn.configure(text="...", state='disabled')
+        elif selected_type == 'hotkey':
+            self.payload_label.configure(text='Tecla de Atalho (Separado por "+"):')
+            self.payload_entry.configure(placeholder_text="Ex: ctrl+c ou ['ctrl', 'alt', 'del']", state='normal')
+            self.select_btn.configure(text="...", state='disabled')
+        elif selected_type == 'script':
+            self.payload_label.configure(text='Caminho do Script Python (.py):')
+            self.payload_entry.configure(placeholder_text="Ex: C:\\Scripts\\meu_script.py", state='normal')
+            self.select_btn.configure(text="...", state='normal', command=lambda: self._select_file_or_macro('script'))
+        elif selected_type == 'macro':
+            self.payload_label.configure(text='Configuração da Macro:')
+            self.payload_entry.configure(placeholder_text="Clique em 'Editar Macro' para configurar a sequência.", state='disabled')
+            self.select_btn.configure(text="🛠️ Editar Macro", state='normal', command=lambda: self._select_file_or_macro('macro'))
+            
+        # Atualiza a referência de ação
+        self._initial_action_type = selected_type
+        
+        # 💡 CORREÇÃO APLICADA AQUI: Retira o foco do campo de texto
+        self.focus()
+
+    def _select_file_or_macro(self, action_type: str):
+        if action_type == 'open_program':
+            filetypes = [("Executáveis", "*.exe"), ("Todos", "*.*")]
+            path = filedialog.askopenfilename(filetypes=filetypes)
+            if not path: return
+            self.payload_entry.delete(0, 'end')
+            self.payload_entry.insert(0, path)
+            
+            # Tenta extrair ícone automaticamente
+            if path.lower().endswith('.exe'):
+                basename = os.path.splitext(os.path.basename(path))[0]
+                safe_makedirs(ICON_FOLDER)
+                out_png = os.path.join(ICON_FOLDER, f"btn{self.button_key}_{basename}.png")
+                extracted = self.icon_loader.extract_icon_to_png(path, out_png, size=128)
+                if extracted:
+                    self._newly_created_icon = extracted
+                    self.icon_path = extracted
+                    self._refresh_icon_preview()
+                    self.logger.info(f"Ícone extraído: {extracted}")
+
+        elif action_type == 'script':
+            filetypes = [("Scripts Python", "*.py"), ("Todos", "*.*")]
+            path = filedialog.askopenfilename(filetypes=filetypes)
+            if not path: return
+            self.payload_entry.delete(0, 'end')
+            self.payload_entry.insert(0, path)
+
+        elif action_type == 'macro':
+            # Abre o editor de macro
+            current_payload = self._initial_payload if self._initial_action_type == 'macro' and isinstance(self._initial_payload, list) else []
+            dlg = MacroEditorDialog(self, current_payload, self.logger) # Passa 'self' (ButtonConfigDialog) como parent
+            self.wait_window(dlg)
+            
+            if dlg.result is not None:
+                macro_data = dlg.result
+                self._initial_payload = macro_data # Atualiza a referência interna
+                try:
+                    # Serializa a macro como JSON para o campo de texto
+                    self.payload_entry.configure(state='normal')
+                    self.payload_entry.delete(0, 'end')
+                    self.payload_entry.insert(0, json.dumps(macro_data, ensure_ascii=False, indent=2)) 
+                    self.payload_entry.configure(state='disabled')
+                    self.logger.info(f"Macro de {len(macro_data)} passos configurada.")
+                except Exception as e:
+                    self.logger.error(f"Erro ao serializar macro: {e}")
+
+    def _choose_icon(self):
+        path = filedialog.askopenfilename(filetypes=[('Images', '*.png *.jpg *.ico'), ('All', '*.*')])
+        if not path: return
+        # Se um ícone foi extraído automaticamente, ele é removido
+        if self._newly_created_icon and os.path.exists(self._newly_created_icon):
+            try: os.remove(self._newly_created_icon)
+            except: pass
+        self._newly_created_icon = None
+        
+        self.icon_path = path
+        self.conf['icon'] = self.icon_path
+        self._refresh_icon_preview()
+
+    def _refresh_icon_preview(self):
+        ctk_img = self.icon_loader.load_icon_from_path(self.icon_path) if self.icon_path else None
+        if ctk_img:
+            self.icon_preview.configure(image=ctk_img, text='')
+            self.icon_preview.image = ctk_img 
+        else:
+            self.icon_preview.configure(image=None, text='📱')
+            self.icon_preview.image = None
+
+    def _on_cancel(self):
+        if self._newly_created_icon and os.path.exists(self._newly_created_icon):
+            try: 
+                os.remove(self._newly_created_icon)
+                self.logger.info(f"Ícone extraído temporário removido: {self._newly_created_icon}")
+            except: 
+                pass
+        self.destroy()
+
+    def _on_delete(self):
+        """
+        Garante a remoção da referência da imagem, recria o IconLoader E
+        TENTA DELETAR O ARQUIVO DO ÍCONE DA PASTA ICONS.
+        """
+        if not messagebox.askyesno("Excluir", "Deseja remover o programa, o ícone e DELETAR o arquivo do ícone?"):
+            return
+
+        try:
+            icon_path_to_delete = self.conf.get('icon', '')
+            nome_do_botao = self.label_var.get()
+            
+            # 1. Limpa a configuração do botão no ConfigManager
+            self.parent.config.data['buttons'][self.button_key] = {
+                "label": f"Botão {self.button_key}",
+                "icon": "",
+                "action": {"type": "none", "payload": ""}
+            }
+            
+            # 2. Reinicia o loader e Recria a tela para garantir a limpeza do fantasma.
+            self.parent._reset_icon_loader()
+            
+            # 3. Limpa a referência interna do diálogo e salva
+            self.icon_path = ""
+            self.conf['icon'] = ""
+            self.parent.config.save()
+
+            # 4. Atualiza a interface
+            self.parent.refresh_all_buttons()
+            
+            # 5. Tenta deletar o arquivo do ícone
+            if icon_path_to_delete:
+                abs_path_to_delete = os.path.abspath(icon_path_to_delete)
+                icons_folder_abs = os.path.abspath(ICON_FOLDER)
+                
+                # Regra de segurança: Apenas exclui se o arquivo estiver DENTRO da pasta 'icons'
+                if abs_path_to_delete.startswith(icons_folder_abs) and os.path.exists(abs_path_to_delete):
+                    try: 
+                        os.remove(abs_path_to_delete)
+                    except Exception as e:
+                        self.parent.logger.error(f"❌ Erro ao deletar arquivo de ícone: {e}")
+                else:
+                    self.parent.logger.info(f"Ícone não está na pasta 'icons', pulando exclusão do disco: {icon_path_to_delete}")
+
+            self.parent.logger.info(f"🗑️ Botão excluído com sucesso: {nome_do_botao} (ID: {self.button_key})")
+            # 6. Fecha o diálogo
+            self.destroy()
+            
+        except Exception as e:
+            self.parent.logger.error(f"❌ Erro durante exclusão: {e}\n{traceback.format_exc()}")
+            messagebox.showerror("Erro", f"Ocorreu um erro durante a exclusão: {e}")
+                
+    def _save_and_close(self):
+        raw_payload = self.payload_entry.get().strip()
+        selected_type_friendly = self.action_type_menu.get()
+        action_type = ACTION_TYPES_REVERSE.get(selected_type_friendly, 'none')
+        
+        payload = raw_payload
+        
+        if action_type == 'macro':
+            if isinstance(self._initial_payload, list):
+                 payload = self._initial_payload
+            else:
+                try:
+                    payload = json.loads(raw_payload)
+                except:
+                    payload = []
+        elif action_type == 'hotkey':
+            try:
+                payload = json.loads(raw_payload)
+            except json.JSONDecodeError:
+                 if raw_payload:
+                    payload = raw_payload
+                 else:
+                     payload = []
+        
+        self.conf['label'] = self.label_var.get()
+        self.conf['icon'] = self.icon_path
+        self.conf['action'] = {'type': action_type, 'payload': payload}
+        
+        self.parent.config.data['buttons'][self.button_key] = self.conf
+        self.parent.config.save()
+        
+        # REINICIA O LOADER e atualiza
+        self.parent._reset_icon_loader()
+        self.parent.refresh_all_buttons()
+        
+        self.destroy()
+
+    def _test_action(self):
+        raw_payload = self.payload_entry.get().strip()
+        selected_type_friendly = self.action_type_menu.get()
+        action_type = ACTION_TYPES_REVERSE.get(selected_type_friendly, 'none')
+        
+        payload = raw_payload
+        
+        if action_type == 'macro':
+            if isinstance(self._initial_payload, list):
+                 payload = self._initial_payload
+            else:
+                try:
+                    payload = json.loads(raw_payload)
+                except:
+                    payload = []
+        elif action_type == 'hotkey':
+             try:
+                payload = json.loads(raw_payload)
+             except json.JSONDecodeError:
+                if raw_payload:
+                    payload = raw_payload
+                else:
+                    payload = []
+                     
+        if action_type == 'macro' and not payload:
+             payload = []
+
+        self.parent.action_manager.perform(Action(action_type, payload))
 
 # -----------------------------
 # Serial Manager
 # -----------------------------
 class SerialManager:
+    # ... (SerialManager code is unchanged and remains correct)
     def __init__(self, config: ConfigManager, logger: Logger, 
                  on_message: Optional[Callable[[str], None]] = None,
                  on_status_change: Optional[Callable[[bool], None]] = None):
@@ -617,13 +1342,13 @@ class SerialManager:
 # Update Checker
 # -----------------------------
 class UpdateChecker:
+    # ... (UpdateChecker code is unchanged and remains correct)
     def __init__(self, config: ConfigManager, logger: Logger):
         self.config = config
         self.logger = logger
 
     def check_update(self) -> Dict[str, Any]:
         """Verifica a versão mais recente no servidor remoto, lendo um arquivo TXT simples."""
-        # Garantindo que a URL correta esteja na config
         url = self.config.data.get('update', {}).get('check_url', UPDATE_CHECK_URL)
 
         if not REQUESTS_AVAILABLE:
@@ -633,18 +1358,13 @@ class UpdateChecker:
             response = requests.get(url, timeout=10)
             response.raise_for_status()
             
-            # 1. Lê o corpo da resposta e remove espaços/quebras de linha
             latest_version_raw = response.text.strip()
-            
-            # 2. Assume que a URL de download é a URL do repositório (ajuste se necessário)
-            download_url = GITHUB_URL # Usando a constante do projeto
+            download_url = GITHUB_URL 
             
             if not latest_version_raw:
                 return {"ok": False, "error": "Conteúdo da versão não encontrado no TXT"}
             
             latest = latest_version_raw
-            
-            # Compara as versões
             is_new = self._version_greater(latest, APP_VERSION)
             
             return {
@@ -653,7 +1373,6 @@ class UpdateChecker:
                 "download_url": download_url, 
                 "is_new": is_new
             }
-            # --- FIM DA CORREÇÃO ---
             
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 429:
@@ -668,7 +1387,6 @@ class UpdateChecker:
 
     @staticmethod
     def _version_greater(a: str, b: str) -> bool:
-        # Este método permanece o mesmo (e está correto para comparar strings de versão)
         try:
             pa = [int(x) for x in (''.join(c for c in a if c.isdigit() or c == '.') or '0').split('.')]
             pb = [int(x) for x in (''.join(c for c in b if c.isdigit() or c == '.') or '0').split('.')]
@@ -678,6 +1396,7 @@ class UpdateChecker:
             return pa > pb
         except Exception:
             return False
+
 
 # -----------------------------
 # Dialogs (Improved About)
@@ -729,200 +1448,6 @@ class AboutDialog(ctk.CTkToplevel):
         gh_btn.pack(fill='x', pady=(0, 10))
         ctk.CTkButton(action_frame, text="Fechar", command=self.destroy, fg_color=COLORS["primary"], hover_color=COLORS["secondary"]).pack(fill='x')
 
-class ButtonConfigDialog(ctk.CTkToplevel):
-    def __init__(self, parent: Esp32DeckApp, button_key: str, conf: Dict[str, Any], icon_loader: IconLoader, logger: Logger):
-        super().__init__(parent)
-        self.parent = parent
-        self.button_key = button_key
-        self.conf = conf
-        self.icon_loader = icon_loader
-        self.logger = logger
-        self._newly_created_icon = None
-        self.title(f'Configurar Botão {button_key}')
-        self.geometry('550x400') 
-        self.resizable(False, False)
-        self.transient(parent)
-        self.grab_set()
-        self._center_window()
-        self.protocol("WM_DELETE_WINDOW", self._on_cancel)
-        self.label_var = tk.StringVar(value=self.conf.get('label', f'Botão {button_key}'))
-        self.icon_path = self.conf.get('icon', '')
-        self._initial_payload = self.conf.get('action', {}).get('payload', '')
-        self._build()
-        
-    def _center_window(self):
-        self.update_idletasks()
-        x = (self.winfo_screenwidth() // 2) - (self.winfo_width() // 2)
-        y = (self.winfo_screenheight() // 2) - (self.winfo_height() // 2)
-        self.geometry(f'+{x}+{y}')
-        
-    def _build(self):
-        main_frame = ctk.CTkFrame(self, corner_radius=10)
-        main_frame.pack(fill='both', expand=True, padx=15, pady=15)
-        ctk.CTkLabel(main_frame, text='Nome do Botão:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', pady=(5, 0))
-        def on_name_change(*args):
-            if len(self.label_var.get()) > 16: self.label_var.set(self.label_var.get()[:16])
-        self.label_var.trace('w', on_name_change)
-        ctk.CTkEntry(main_frame, textvariable=self.label_var, width=400, placeholder_text="Máximo 16 caracteres").pack(fill='x', pady=5)
-        icon_frame = ctk.CTkFrame(main_frame, corner_radius=8)
-        icon_frame.pack(fill='x', pady=10)
-        ctk.CTkLabel(icon_frame, text='Ícone e Programa:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', padx=10, pady=10)
-        icon_content = ctk.CTkFrame(icon_frame, fg_color="transparent")
-        icon_content.pack(fill='x', padx=10, pady=5)
-        self.icon_preview = ctk.CTkLabel(icon_content, text='📱', width=64, height=64, font=ctk.CTkFont(size=20), text_color=COLORS["primary"])
-        self.icon_preview.pack(side='left', padx=10)
-        btn_frame = ctk.CTkFrame(icon_content, fg_color="transparent")
-        btn_frame.pack(side='left', padx=10)
-        ctk.CTkButton(btn_frame, text='Escolher Ícone', width=140, command=self._choose_icon).pack(side='left', padx=5)
-        ctk.CTkButton(btn_frame, text='Selecionar Programa', width=140, command=self._select_program_for_button).pack(side='left', padx=5)
-        payload_frame = ctk.CTkFrame(main_frame, corner_radius=8)
-        payload_frame.pack(fill='x', pady=10)
-        ctk.CTkLabel(payload_frame, text='Comando / Caminho:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', padx=10, pady=(10, 5))
-        self.payload_entry = ctk.CTkEntry(payload_frame, height=35)
-        self.payload_entry.pack(fill='x', padx=10, pady=(0, 10))
-        try:
-            val = json.dumps(self._initial_payload, ensure_ascii=False) if isinstance(self._initial_payload, (dict, list)) else str(self._initial_payload)
-            self.payload_entry.insert(0, val)
-        except: self.payload_entry.insert(0, str(self._initial_payload))
-        buttons_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        buttons_frame.pack(fill='x', pady=10)
-        inner_buttons_frame = ctk.CTkFrame(buttons_frame, fg_color="transparent")
-        inner_buttons_frame.pack(expand=True)
-        ctk.CTkButton(inner_buttons_frame, text='▶️ Testar', command=self._test_action, fg_color=COLORS["primary"], width=80).pack(side='left', padx=5)
-        ctk.CTkButton(inner_buttons_frame, text='🗑️ Excluir', command=self._on_delete, fg_color=COLORS["danger"], width=80).pack(side='left', padx=5)
-        ctk.CTkButton(inner_buttons_frame, text='🚫 Cancelar', command=self._on_cancel, fg_color="#6c757d", width=80).pack(side='left', padx=5)
-        ctk.CTkButton(inner_buttons_frame, text='💾 Salvar', command=self._save_and_close, fg_color=COLORS["success"], width=80).pack(side='left', padx=5)
-        self._refresh_icon_preview()
-
-    def _select_program_for_button(self):
-        exe_path = filedialog.askopenfilename(filetypes=[("Executáveis", "*.exe"), ("Todos", "*.*")])
-        if not exe_path: return
-        self.payload_entry.delete(0, 'end')
-        self.payload_entry.insert(0, exe_path)
-        basename = os.path.splitext(os.path.basename(exe_path))[0]
-        safe_makedirs(ICON_FOLDER)
-        out_png = os.path.join(ICON_FOLDER, f"btn{self.button_key}_{basename}.png")
-        extracted = self.icon_loader.extract_icon_to_png(exe_path, out_png, size=128)
-        self.conf['action'] = {'type': 'open_program', 'payload': exe_path}
-        if extracted:
-            self._newly_created_icon = extracted
-            self.icon_path = extracted
-            self.conf['icon'] = self.icon_path
-            self._refresh_icon_preview()
-            messagebox.showinfo("Ícone", f"Ícone extraído: {extracted}")
-
-    def _choose_icon(self):
-        path = filedialog.askopenfilename(filetypes=[('Images', '*.png *.jpg *.ico'), ('All', '*.*')])
-        if not path: return
-        self._newly_created_icon = None
-        self.icon_path = path
-        self.conf['icon'] = self.icon_path
-        self._refresh_icon_preview()
-
-    def _refresh_icon_preview(self):
-        ctk_img = self.icon_loader.load_icon_from_path(self.icon_path) if self.icon_path else None
-        if ctk_img:
-            self.icon_preview.configure(image=ctk_img, text='')
-            self.icon_preview.image = ctk_img 
-        else:
-            self.icon_preview.configure(image=None, text='📱')
-            self.icon_preview.image = None
-
-    def _on_cancel(self):
-        if self._newly_created_icon and os.path.exists(self._newly_created_icon):
-            try: 
-                os.remove(self._newly_created_icon)
-                self.logger.info(f"Ícone extraído temporário removido: {self._newly_created_icon}")
-            except: 
-                pass
-        self.destroy()
-
-    def _on_delete(self):
-        """
-        Garante a remoção da referência da imagem, recria o IconLoader E
-        TENTA DELETAR O ARQUIVO DO ÍCONE DA PASTA ICONS.
-        """
-        if not messagebox.askyesno("Excluir", "Deseja remover o programa, o ícone e DELETAR o arquivo do ícone?"):
-            return
-
-        try:
-            # Captura o caminho do ícone antes de limpar a configuração
-            icon_path_to_delete = self.conf.get('icon', '')
-            nome_do_botao = self.label_var.get()
-            
-            # 1. Limpa a configuração do botão no ConfigManager
-            self.parent.config.data['buttons'][self.button_key] = {
-                "label": f"Botão {self.button_key}",
-                "icon": "",
-                "action": {"type": "none", "payload": ""}
-            }
-            
-            # 2. Reinicia o loader e Recria a tela para garantir a limpeza do fantasma.
-            self.parent._reset_icon_loader()
-            
-            # 3. Limpa a referência interna do diálogo e salva
-            self.icon_path = ""
-            self.conf['icon'] = ""
-            self.parent.config.save()
-
-            # 4. Atualiza a interface
-            self.parent.refresh_all_buttons()
-            
-            # 5. [AQUI ESTÁ A MUDANÇA] Tenta deletar o arquivo do ícone
-            if icon_path_to_delete:
-                abs_path_to_delete = os.path.abspath(icon_path_to_delete)
-                icons_folder_abs = os.path.abspath(ICON_FOLDER)
-                
-                # Regra de segurança: Apenas exclui se o arquivo estiver DENTRO da pasta 'icons'
-                # e se o arquivo existir.
-                if abs_path_to_delete.startswith(icons_folder_abs) and os.path.exists(abs_path_to_delete):
-                    try: 
-                        os.remove(abs_path_to_delete)
-                    except Exception as e:
-                        self.parent.logger.error(f"❌ Erro ao deletar arquivo de ícone: {e}")
-                else:
-                    self.parent.logger.info(f"Ícone não está na pasta 'icons', pulando exclusão do disco: {icon_path_to_delete}")
-
-            self.parent.logger.info(f"🗑️ Botão excluído com sucesso: {nome_do_botao} (ID: {self.button_key})")
-            # 6. Fecha o diálogo
-            self.destroy()
-            
-        except Exception as e:
-            self.parent.logger.error(f"❌ Erro durante exclusão: {e}\n{traceback.format_exc()}")
-            messagebox.showerror("Erro", f"Ocorreu um erro durante a exclusão: {e}")
-                
-    def _save_and_close(self):
-        raw = self.payload_entry.get().strip()
-        payload = raw
-        try: 
-            payload = json.loads(raw) if raw else ''
-        except: 
-            pass
-            
-        self.conf['label'] = self.label_var.get()
-        self.conf['icon'] = self.icon_path
-        
-        action_type = self.conf.get('action', {}).get('type', 'open_program')
-        if action_type == 'none' and payload:
-            action_type = 'open_program' 
-
-        self.conf['action'] = {'type': action_type, 'payload': payload}
-        self.parent.config.data['buttons'][self.button_key] = self.conf
-        self.parent.config.save()
-        
-        # REINICIA O LOADER e atualiza
-        self.parent._reset_icon_loader()
-        self.parent.refresh_all_buttons()
-        
-        self.destroy()
-
-    def _test_action(self):
-        raw = self.payload_entry.get().strip()
-        inferred_type = 'open_program'
-        if raw.lower().startswith('http'):
-             inferred_type = 'open_url'
-        
-        self.parent.action_manager.perform(Action(inferred_type, raw))
 
 # -----------------------------
 # GUI / App
@@ -962,17 +1487,14 @@ class Esp32DeckApp(ctk.CTk):
 
         self.colors = COLORS.copy()
         self.current_font_size = 14
-        saved_font = self.config.data.get('appearance', {}).get('font_size', 'Médio')
-        if saved_font == 'Pequeno': self.current_font_size = 12
-        elif saved_font == 'Grande': self.current_font_size = 18
-
+        
         # Inicializa a lista de widgets de botões
         self.button_frames: Dict[str, Dict[str, Any]] = {}
         
         ctk.set_appearance_mode(self.config.data.get('appearance', {}).get('theme', 'System'))
         
         self._build_ui()
-        self._load_appearance_settings()
+        self._load_appearance_settings() # Deve vir após _build_ui
         
         self.logger.textbox = self.log_textbox
         
@@ -985,8 +1507,10 @@ class Esp32DeckApp(ctk.CTk):
         atexit.register(self._cleanup_on_exit)
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
-        self.logger.info(f"  💻 Dev: {DEVELOPER}\n")
-        self.logger.info(f"🔗 GitHub: {GITHUB_URL}\n")
+        self.logger.info(f"--- {APP_NAME} v{APP_VERSION} Iniciado ---")
+        self.logger.info(f"  💻 Dev: {DEVELOPER}")
+        self.logger.info(f"🔗 GitHub: {GITHUB_URL}")
+
     def _reset_icon_loader(self):
         """Destrói e recria o IconLoader para forçar a limpeza total da memória de imagens."""
         size = self.config.data.get('appearance', {}).get('icon_size', ICON_SIZE[0])
@@ -1027,7 +1551,9 @@ class Esp32DeckApp(ctk.CTk):
         try:
             self.logger.info("🚪 Fechando aplicação...")
             if hasattr(self, 'serial_manager'): self.serial_manager.disconnect()
-            if hasattr(self, 'config'): self.config.save()
+            if hasattr(self, 'config'): 
+                self.config.data['version'] = APP_VERSION # Garante que a versão atual está salva
+                self.config.save()
             if hasattr(self, 'tray_manager'): self.tray_manager.stop()
         except Exception: pass
 
@@ -1043,7 +1569,7 @@ class Esp32DeckApp(ctk.CTk):
         try:
             if isinstance(widget, ctk.CTkButton):
                 text = widget.cget("text")
-                if text in ["💾 Salvar", "🔗 Conectar"]: 
+                if text in ["💾 Salvar", "🔗 Conectar", "💾 Salvar Macro", "💾 Salvar Ação"]: 
                     widget.configure(fg_color=self.colors["success"], hover_color=self.colors["success"] if self.colors["success"] != COLORS["success"] else "#1e7a30")
                 elif text in ["🗑️ Excluir", "🔓 Desconectar"]: 
                     widget.configure(fg_color=self.colors["danger"], hover_color=self.colors["danger"] if self.colors["danger"] != COLORS["danger"] else "#a92a39")
@@ -1051,7 +1577,7 @@ class Esp32DeckApp(ctk.CTk):
                     widget.configure(fg_color=self.colors["primary"], hover_color=self.colors["secondary"])
                 elif text in ["🚫 Cancelar"]: 
                     widget.configure(fg_color="#6c757d", hover_color="#5a6268")
-                elif text in ["🔄 Atualizar", "🔄 Restaurar Configurações Padrão", "🔄 Atualizar Portas"]: 
+                elif text in ["🔄 Atualizar", "🔄 Restaurar Configurações Padrão", "🔄 Atualizar Portas", "⬇️ Baixar Atualização"]: 
                     widget.configure(fg_color=self.colors["warning"], text_color="black" if ctk.get_appearance_mode() == "Light" else "white", hover_color=self.colors["warning"] if self.colors["warning"] != COLORS["warning"] else "#d9a100")
                 else: 
                     widget.configure(fg_color=self.colors["primary"], hover_color=self.colors["secondary"])
@@ -1080,6 +1606,7 @@ class Esp32DeckApp(ctk.CTk):
         self.attributes('-alpha', transparency)
         if hasattr(self, 'transparency_var'):
             self.transparency_var.set(transparency)
+        
         self._on_color_scheme_change(app.get('color_scheme', 'Padrão'))
         self._on_font_size_change(app.get('font_size', 'Médio'))
 
@@ -1145,10 +1672,7 @@ class Esp32DeckApp(ctk.CTk):
             
             self.config.save()
             messagebox.showinfo("Reset", "Configurações restauradas!")
-
-    # -----------------------------
-    # UI Construction
-    # -----------------------------
+    
     def _build_ui(self):
         self._build_header()
         self.tabview = ctk.CTkTabview(self, width=860, height=500, corner_radius=10)
@@ -1209,30 +1733,31 @@ class Esp32DeckApp(ctk.CTk):
             state_conn = 'disabled' if connected else 'normal'
             state_disc = 'normal' if connected else 'disabled'
             
-            self.connect_btn.configure(state=state_conn)
-            self.port_option.configure(state=state_conn)
-            self.baud_option.configure(state=state_conn)
-            self.refresh_ports_btn.configure(state=state_conn)
-            self.disconnect_btn.configure(state=state_disc)
+            if hasattr(self, 'connect_btn'): # Garante que os widgets existem
+                self.connect_btn.configure(state=state_conn)
+                self.port_option.configure(state=state_conn)
+                self.baud_option.configure(state=state_conn)
+                self.refresh_ports_btn.configure(state=state_conn)
+                self.disconnect_btn.configure(state=state_disc)
 
-            if connected:
-                self.status_card.configure(border_color=self.colors["success"])
-                self.dash_icon.configure(text="⚡")
-                self.dash_status_text.configure(text="CONECTADO", text_color=self.colors["success"])
-                self.dash_sub_text.configure(text="O sistema está pronto para receber comandos.")
-                
-                current_port = self.port_option.get()
-                current_baud = self.baud_option.get()
-                self.lbl_detail_port.configure(text=f"Porta Ativa: {current_port}")
-                self.lbl_detail_baud.configure(text=f"Velocidade:  {current_baud} bps")
-                self.details_frame.pack(fill='x', ipadx=20, ipady=10)
-                
-            else:
-                self.status_card.configure(border_color=self.colors["secondary"])
-                self.dash_icon.configure(text="🔌") 
-                self.dash_status_text.configure(text="DESCONECTADO", text_color=self.colors["danger"])
-                self.dash_sub_text.configure(text="Selecione uma porta e clique em conectar.")
-                self.details_frame.pack_forget()
+                if connected:
+                    self.status_card.configure(border_color=self.colors["success"])
+                    self.dash_icon.configure(text="⚡")
+                    self.dash_status_text.configure(text="CONECTADO", text_color=self.colors["success"])
+                    self.dash_sub_text.configure(text="O sistema está pronto para receber comandos.")
+                    
+                    current_port = self.port_option.get()
+                    current_baud = self.baud_option.get()
+                    self.lbl_detail_port.configure(text=f"Porta Ativa: {current_port}")
+                    self.lbl_detail_baud.configure(text=f"Velocidade:  {current_baud} bps")
+                    self.details_frame.pack(fill='x', ipadx=20, ipady=10)
+                    
+                else:
+                    self.status_card.configure(border_color=self.colors["secondary"])
+                    self.dash_icon.configure(text="🔌") 
+                    self.dash_status_text.configure(text="DESCONECTADO", text_color=self.colors["danger"])
+                    self.dash_sub_text.configure(text="Selecione uma porta e clique em conectar.")
+                    self.details_frame.pack_forget()
 
     def _build_buttons_tab(self, grid_frame):
         """Constrói a aba de configuração de botões (Grid 4x2)."""
@@ -1261,7 +1786,7 @@ class Esp32DeckApp(ctk.CTk):
         btn_frame.grid_propagate(False)
         
         # 2. Widgets internos
-        icon_label = ctk.CTkLabel(btn_frame, text='📱', width=80, height=80, font=ctk.CTkFont(size=24), text_color=self.colors["primary"])
+        icon_label = ctk.CTkLabel(btn_frame, text='📱', width=64, height=64, font=ctk.CTkFont(size=24), text_color=self.colors["primary"])
         icon_label.pack(pady=(15, 5))
         
         btn_conf = self.config.data.get('buttons', {}).get(key, {})
@@ -1603,7 +2128,8 @@ class Esp32DeckApp(ctk.CTk):
             self.config.save()
             
         conf = self.config.data['buttons'][button_key]
-        dlg = ButtonConfigDialog(self, button_key, conf, self.icon_loader, self.logger)
+        # Passa a cópia do dict de config (importante para o cancelamento)
+        dlg = ButtonConfigDialog(self, button_key, conf.copy(), self.icon_loader, self.logger) 
         self.wait_window(dlg)
         
         self.config.save()

@@ -29,3 +29,5 @@ Thumbs.db
 # Arquivos de IDEs e editores
 .idea/
 *.swp
+output/Esp32_deck.log
+Esp32_deck.log
