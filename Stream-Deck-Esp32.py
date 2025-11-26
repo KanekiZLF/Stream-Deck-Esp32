@@ -902,7 +902,7 @@ class ButtonConfigDialog(ctk.CTkToplevel):
         self.logger = logger
         self._newly_created_icon = None
         self.title(f'Configurar Botão {button_key}')
-        self.geometry('550x500') # Aumentado para acomodar o menu de ação
+        self.geometry('550x460') # Aumentado para acomodar o menu de ação
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
