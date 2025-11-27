@@ -3,7 +3,7 @@
 
 # Outras pastas e arquivos comuns a serem ignorados
 config.json
-Esp32_deck.log
+Esp32_deck.log*
 token.txt
 icons/
 
@@ -31,3 +31,6 @@ Thumbs.db
 *.swp
 output/Esp32_deck.log
 Esp32_deck.log
+output/Esp32_deck.log
+Esp32_deck.log
+Esp32_deck_config.json
