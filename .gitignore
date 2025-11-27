@@ -34,3 +34,4 @@ Esp32_deck.log
 output/Esp32_deck.log
 Esp32_deck.log
 Esp32_deck_config.json
+utils/version_info.txt
