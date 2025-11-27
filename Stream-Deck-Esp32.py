@@ -67,7 +67,7 @@ except ImportError:
 CONFIG_FILE = "Esp32_deck_config.json"
 ICON_FOLDER = "icons"
 LOG_FILE = "Esp32_deck.log"
-APP_VERSION = "1.5.17" # Versão: Correção de Foco ao Mudar Tipo de Ação
+APP_VERSION = "2.0.0"
 APP_NAME = "Esp32 Deck Controller"
 APP_ICON_NAME = "app_icon.ico"
 DEVELOPER = "Luiz F. R. Pimentel"
@@ -121,7 +121,6 @@ def get_app_icon_path() -> str:
     """Retorna o caminho absoluto para o ícone da aplicação, tratando o ambiente PyInstaller."""
     base_path = os.path.abspath(os.path.dirname(__file__))
     
-    # 🌟 CORREÇÃO: Trata o caminho temporário do PyInstaller
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
         base_path = sys._MEIPASS
     
@@ -370,7 +369,6 @@ class IconLoader:
 # Tray Icon Manager
 # -----------------------------
 class TrayIconManager:
-    # ... (TrayIconManager code is unchanged and remains correct)
     def __init__(self, app_reference, logger: Logger):
         self.app = app_reference
         self.logger = logger
@@ -430,7 +428,6 @@ class TrayIconManager:
 # Window Manager
 # -----------------------------
 class WindowManager:
-    # ... (WindowManager code is unchanged and remains correct)
     def __init__(self, logger: Logger):
         self.logger = logger
         
@@ -456,7 +453,6 @@ class WindowManager:
         target_hwnds = []
 
         try:
-            # Correção para lidar com scripts Python: verifica por caminho completo ou nome
             for proc in psutil.process_iter(['name', 'exe', 'pid']):
                 try:
                     if proc.info['exe'] and os.path.samefile(proc.info['exe'], exe_path):
@@ -590,6 +586,9 @@ class SubActionConfigDialog(ctk.CTkToplevel):
     """Novo diálogo CustomTkinter para configurar uma única ação dentro de uma macro."""
     def __init__(self, parent, initial_type: str, initial_payload: Any, logger: Logger):
         super().__init__(parent)
+        
+        self.withdraw()
+        
         self.parent = parent
         self.logger = logger
         self.title("Configurar Ação da Macro")
@@ -604,8 +603,7 @@ class SubActionConfigDialog(ctk.CTkToplevel):
         self.initial_payload = initial_payload
         
         self._build_ui()
-        
-        # Correção de foco: Forçar a janela a ficar na frente
+        self.deiconify()
         self.lift()
         
     def _center_window(self):
@@ -692,7 +690,6 @@ class SubActionConfigDialog(ctk.CTkToplevel):
         # Define o placeholder_text
         self.payload_entry.configure(placeholder_text=placeholders.get(selected_type, ''))
         
-        # 💡 CORREÇÃO APLICADA AQUI: Retira o foco do campo de texto
         self.focus()
 
     def _save_action(self):
@@ -719,6 +716,9 @@ class SubActionConfigDialog(ctk.CTkToplevel):
 class MacroEditorDialog(ctk.CTkToplevel):
     def __init__(self, parent, initial_macro: List[Dict[str, Any]], logger: Logger):
         super().__init__(parent)
+        
+        self.withdraw()
+        
         self.logger = logger
         self.title("Editor de Macro")
         self.geometry("600x500")
@@ -735,7 +735,7 @@ class MacroEditorDialog(ctk.CTkToplevel):
         self._build_ui()
         self._populate_list()
         
-        # Correção de Foco: Levanta a janela para garantir que não vá para trás
+        self.deiconify()
         self.lift() 
         
     def _center_window(self):
@@ -751,7 +751,6 @@ class MacroEditorDialog(ctk.CTkToplevel):
         
         ctk.CTkLabel(list_frame, text="Sequência de Ações (Executada em Ordem)", font=ctk.CTkFont(weight="bold")).pack(anchor='w', padx=10, pady=(10, 5))
 
-        # 💡 CORREÇÃO APLICADA: Substituir get_appearance_mode_color
         # Determina as cores com base no modo de aparência atual
         if ctk.get_appearance_mode().lower() in ["dark", "system"]:
             bg_color = "#343638"  # Fundo escuro (CTK Dark BG)
@@ -850,8 +849,7 @@ class MacroEditorDialog(ctk.CTkToplevel):
         if index is not None:
             initial_type = self.macro_list[index].get('type', 'none')
             initial_payload = self.macro_list[index].get('payload', '')
-        
-        # 💡 CORREÇÃO APLICADA: Usa o novo SubActionConfigDialog (CTkToplevel)
+
         dlg = SubActionConfigDialog(self, initial_type, initial_payload, self.logger)
         self.wait_window(dlg)
         
@@ -895,6 +893,9 @@ class MacroEditorDialog(ctk.CTkToplevel):
 class ButtonConfigDialog(ctk.CTkToplevel):
     def __init__(self, parent: Esp32DeckApp, button_key: str, conf: Dict[str, Any], icon_loader: IconLoader, logger: Logger):
         super().__init__(parent)
+        
+        self.withdraw()
+        
         self.parent = parent
         self.button_key = button_key
         self.conf = conf
@@ -902,7 +903,7 @@ class ButtonConfigDialog(ctk.CTkToplevel):
         self.logger = logger
         self._newly_created_icon = None
         self.title(f'Configurar Botão {button_key}')
-        self.geometry('550x460') # Aumentado para acomodar o menu de ação
+        self.geometry('550x500') # Aumentado para acomodar o menu de ação
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
@@ -915,8 +916,7 @@ class ButtonConfigDialog(ctk.CTkToplevel):
         self._initial_payload = self.conf.get('action', {}).get('payload', '')
         
         self._build()
-        
-        # Correção de foco: Forçar a janela a ficar na frente
+        self.deiconify()
         self.lift() 
         
     def _center_window(self):
@@ -1057,7 +1057,6 @@ class ButtonConfigDialog(ctk.CTkToplevel):
         # Atualiza a referência de ação
         self._initial_action_type = selected_type
         
-        # 💡 CORREÇÃO APLICADA AQUI: Retira o foco do campo de texto
         self.focus()
 
     def _select_file_or_macro(self, action_type: str):
@@ -1259,7 +1258,6 @@ class ButtonConfigDialog(ctk.CTkToplevel):
 # Serial Manager
 # -----------------------------
 class SerialManager:
-    # ... (SerialManager code is unchanged and remains correct)
     def __init__(self, config: ConfigManager, logger: Logger, 
                  on_message: Optional[Callable[[str], None]] = None,
                  on_status_change: Optional[Callable[[bool], None]] = None):
@@ -1342,7 +1340,6 @@ class SerialManager:
 # Update Checker
 # -----------------------------
 class UpdateChecker:
-    # ... (UpdateChecker code is unchanged and remains correct)
     def __init__(self, config: ConfigManager, logger: Logger):
         self.config = config
         self.logger = logger
@@ -1455,6 +1452,9 @@ class AboutDialog(ctk.CTkToplevel):
 class Esp32DeckApp(ctk.CTk):
     def __init__(self):
         super().__init__()
+        
+        self.withdraw()
+        
         ctk.deactivate_automatic_dpi_awareness()
         self.title(f'{APP_NAME} v{APP_VERSION}')
         self.geometry('900x700')
@@ -2107,7 +2107,6 @@ class Esp32DeckApp(ctk.CTk):
                 if icon_path and os.path.exists(icon_path):
                     ctk_img = self.icon_loader.load_icon_from_path(icon_path)
 
-                # Aplica o ícone ou o placeholder
                 widget_map = self.button_frames[key]
                 widget_map['title_label'].configure(text=btn_conf.get('label', f'Botão {key}'))
                 
@@ -2120,7 +2119,7 @@ class Esp32DeckApp(ctk.CTk):
                 
                 btn_id += 1
 
-        self.update() # Força a atualização de todos os widgets na tela
+        self.update()
 
     def open_button_config(self, button_key: str):
         if 'buttons' not in self.config.data:
@@ -2128,7 +2127,7 @@ class Esp32DeckApp(ctk.CTk):
             self.config.save()
             
         conf = self.config.data['buttons'][button_key]
-        # Passa a cópia do dict de config (importante para o cancelamento)
+
         dlg = ButtonConfigDialog(self, button_key, conf.copy(), self.icon_loader, self.logger) 
         self.wait_window(dlg)
         
@@ -2253,6 +2252,9 @@ class Esp32DeckApp(ctk.CTk):
 def main():
     ctk.set_appearance_mode('System')
     app = Esp32DeckApp()
+
+    app.deiconify() 
+    
     app.protocol('WM_DELETE_WINDOW', app.on_closing)
     app.mainloop()
 
