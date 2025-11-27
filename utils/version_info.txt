@@ -25,12 +25,12 @@ VSVersionInfo(
                     [
                         StringStruct(u'CompanyName', u'Luiz F. R. Pimentel'),
                         StringStruct(u'FileDescription', u'Controller para ESP32 Deck - Atalhos e Automação'),
-                        StringStruct(u'FileVersion', u'1.5.12'),
+                        StringStruct(u'FileVersion', u'2.0.0'),
                         StringStruct(u'InternalName', u'Esp32DeckController'),
                         StringStruct(u'LegalCopyright', u'Copyright © 2025 Luiz F. R. Pimentel. Todos os direitos reservados.'),
                         StringStruct(u'OriginalFilename', u'Esp32 Deck Controller.exe'),
                         StringStruct(u'ProductName', u'Esp32 Deck Controller'),
-                        StringStruct(u'ProductVersion', u'1.5.12')
+                        StringStruct(u'ProductVersion', u'2.0.0')
                     ]
                 )
             ]
