@@ -1,35 +1,68 @@
-# 🎮 ESP32 Deck Controller
+# 🎮 ESP32 Deck Controller v2.0.0
 
 <div align="center">
 
-![ESP32 Deck](https://img.shields.io/badge/ESP32-Deck_Controller_2.4-blue?style=for-the-badge&logo=arduino)
+![ESP32 Deck](https://img.shields.io/badge/ESP32-Deck_Controller_2.0-blue?style=for-the-badge&logo=arduino)
 ![Python](https://img.shields.io/badge/Python-3.8%2B-green?style=for-the-badge&logo=python)
 ![CustomTkinter](https://img.shields.io/badge/GUI-CustomTkinter-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
 
-**Controlador físico personalizável com ESP32 + Shift Register + Display TFT**
+**Sistema completo de automação com ESP32 - Foco, Produtividade e Controle**
 
-[✨ Funcionalidades](#-funcionalidades) • [🛠 Tecnologias](#-tecnologias) • [🚀 Instalação](#-instalação) • [🔧 Hardware](#-hardware) • [💾 Firmware](#-firmware) • [🎯 Como Usar](#-como-usar)
+[✨ Novidades da v2.0](#-novidades-da-v20) • [🎛️ Funcionalidades](#️-funcionalidades) • [🛠 Tecnologias](#-tecnologias) • [🚀 Instalação](#-instalação) • [🔧 Hardware](#-hardware) • [💾 Configuração](#-configuração) • [🎯 Como Usar](#-como-usar)
 
 </div>
 
-## ✨ Funcionalidades
+## ✨ Novidades da v2.0
 
-### 🎛️ Sistema Físico Avançado
+### 🎯 **Sistema Avançado de Macros e Ações**
+
+| Funcionalidade                 | Descrição                                                | Status              |
+| :----------------------------- | :------------------------------------------------------- | :------------------ |
+| **Editor de Macro Sequencial** | Construa listas ordenadas de comandos com delays         | ✅ **IMPLEMENTADO** |
+| **Editor de Ações Unificado**  | Interface centralizada para todos os tipos de ação       | ✅ **IMPLEMENTADO** |
+| **Hotkey Profissional**        | Suporte a combinações complexas (`["ctrl","alt","del"]`) | ✅ **IMPLEMENTADO** |
+| **Digitação Automática**       | Automação de texto para senhas, URLs e respostas         | ✅ **IMPLEMENTADO** |
+| **Execução de Scripts Python** | Execute arquivos `.py` locais como automações            | ✅ **IMPLEMENTADO** |
+
+### 🖥️ **Estabilidade e Experiência do Usuário**
+
+| Melhoria                        | Impacto                                       | Status              |
+| :------------------------------ | :-------------------------------------------- | :------------------ |
+| **Eliminação de Flickering**    | Técnica de desenho oculto em todas as janelas | ✅ **IMPLEMENTADO** |
+| **Gestão de Foco Perfeita**     | Correção de bugs de placeholder persistente   | ✅ **IMPLEMENTADO** |
+| **Layout Centralizado**         | Botões organizados e padronizados             | ✅ **IMPLEMENTADO** |
+| **Otimização de Inicialização** | Carregamento mais rápido antes da exibição    | ✅ **IMPLEMENTADO** |
+
+---
+
+## 🎛️ Funcionalidades
+
+### 🎮 **Sistema Físico Avançado**
 
 - **8 botões físicos** com leitura via shift register 74HC165
 - **Display TFT integrado** 135x240 pixels com múltiplas interfaces
 - **Feedback visual** em tempo real do status da conexão
 - **6 temas de interface** diferentes para personalização
 
-### 🔌 Comunicação Bilateral
+### 🔌 **Comunicação Bilateral**
 
 - **Protocolo serial** bidirecional ESP32 ↔ Software
 - **Conexão automática** com handshake de confirmação
 - **Monitoramento em tempo real** do status da comunicação
 - **Comandos de controle** (CONNECTED, DISCONNECT, PING)
 
-### 🎨 Múltiplas Interfaces Visuais
+### ⚡ **Sistema de Ações (COMPLETO)**
+
+- **`open_program`** - Abrir programas/executáveis com toggle de janelas
+- **`open_url`** - Abrir URLs no navegador padrão
+- **`run_cmd`** - Executar comandos Shell/CMD
+- **`type_text`** - Digitação automática de texto
+- **`hotkey`** - Combinações de teclas complexas
+- **`script`** - Executar scripts Python
+- **`macro`** - Sequências de ações automatizadas
+
+### 🎨 **Múltiplas Interfaces Visuais**
 
 - **Interface Compacta** - Informações essenciais organizadas
 - **Interface Moderna** - Design limpo com header destacado
@@ -38,47 +71,45 @@
 - **Interface Gaming** - Visual estilo stream deck com elementos destacados
 - **Interface Clássica** - Design tradicional com bordas arredondadas
 
-### ⚡ Sistema de Ações
-
-- **Execução de programas** (.exe)
-- **Abertura de URLs** no navegador padrão (EM BREVE)
-- **Execução de comandos** do sistema operacional (EM BREVE)
-- **Digitação automática** de texto (EM BREVE)
-- **Sistema de macros** para ações complexas (EM BREVE)
+---
 
 ## 🛠 Tecnologias
 
-### 💻 Software
+### 💻 **Software**
 
-| Tecnologia        | Versão  | Propósito                       |
-| ----------------- | ------- | ------------------------------- |
-| **Python**        | 3.8+    | Linguagem principal             |
-| **CustomTkinter** | 5.2.0+  | Interface gráfica moderna       |
-| **Pillow (PIL)**  | 10.0.0+ | Manipulação de imagens e ícones |
-| **PySerial**      | 3.5+    | Comunicação serial com ESP32    |
-| **PyAutoGUI**     | 0.9.54+ | Automação de teclado/mouse      |
-| **Requests**      | 2.31.0+ | Verificação de atualizações     |
-| **PyWin32**       | 306+    | Extração de ícones do Windows   |
+| Tecnologia        | Versão  | Propósito                       | Status v2.0 |
+| :---------------- | :------ | :------------------------------ | :---------- |
+| **Python**        | 3.8+    | Linguagem principal             | ✅          |
+| **CustomTkinter** | 5.2.0+  | Interface gráfica moderna       | ✅          |
+| **Pillow (PIL)**  | 10.0.0+ | Manipulação de imagens e ícones | ✅          |
+| **PySerial**      | 3.5+    | Comunicação serial com ESP32    | ✅          |
+| **PyAutoGUI**     | 0.9.54+ | Automação de teclado/mouse      | ✅          |
+| **Requests**      | 2.31.0+ | Verificação de atualizações     | ✅          |
+| **PyWin32**       | 306+    | Extração de ícones do Windows   | ✅          |
+| **PsUtil**        | 5.9.0+  | Gerenciamento de processos      | ✅          |
+| **PyStray**       | 0.19.0+ | System tray integration         | ✅          |
 
-### 🔌 Hardware
+### 🔌 **Hardware**
 
 | Componente         | Especificação       | Função                     |
-| ------------------ | ------------------- | -------------------------- |
+| :----------------- | :------------------ | :------------------------- |
 | **ESP32**          | ESP-WROOM-32        | Microcontrolador principal |
 | **Shift Register** | 74HC165             | Expansão de entradas       |
 | **Display TFT**    | 1.14" 135x240 SPI   | Interface visual           |
 | **Botões**         | 8x Tactile switches | Controles físicos          |
 
+---
+
 ## 🚀 Instalação
 
-### 📋 Pré-requisitos
+### 📋 **Pré-requisitos**
 
 - **Python 3.8 ou superior**
 - **ESP32 com firmware compatível**
 - **Windows 10/11** (recomendado)
 - **Conexão USB** para comunicação serial
 
-### 📥 Instalação Rápida
+### 📥 **Instalação Rápida (Executável)**
 
 1. **Baixe o executável:**
 
@@ -87,11 +118,10 @@
 
 2. **Execute diretamente:**
    ```bash
-   # Duplo clique no arquivo .exe ou
    Stream-Deck-Esp32.exe
    ```
 
-### 🐍 Para Desenvolvedores
+### 🐍 **Para Desenvolvedores**
 
 1. **Clone o repositório:**
 
@@ -108,10 +138,10 @@
 
 3. **Execute o programa:**
    ```bash
-   python Stream-Deck-Esp32.py
+   python "Stream-Deck-Esp32.py"
    ```
 
-### 📋 Arquivo requirements.txt
+### 📋 **Arquivo requirements.txt**
 
 ```txt
 customtkinter>=5.2.0
@@ -124,12 +154,14 @@ pystray>=0.19.0
 psutil>=5.9.0
 ```
 
+---
+
 ## 🔧 Hardware
 
-### 📋 Lista de Componentes
+### 📋 **Lista de Componentes**
 
 | Componente        | Quantidade | Observações                    |
-| ----------------- | ---------- | ------------------------------ |
+| :---------------- | :--------- | :----------------------------- |
 | ESP32             | 1          | Qualquer versão com USB        |
 | 74HC165           | 1          | Shift register paralelo-serial |
 | Display TFT 1.14" | 1          | SPI, 135x240 pixels            |
@@ -138,7 +170,7 @@ psutil>=5.9.0
 | Protoboard        | 1          | Para montagem                  |
 | Cabos jumper      | Vários     | Conexões                       |
 
-### 🔌 Esquema de Ligação
+### 🔌 **Esquema de Ligação**
 
 ```
 ESP32 → 74HC165 (Shift Register)
@@ -164,69 +196,35 @@ VCC     → 3.3V
 GND     → GND
 ```
 
-## 💾 Firmware
+---
 
-### ⚙️ Características do Código
+## 💾 Configuração
 
-- **Multi-interface** - 6 temas diferentes
-- **Leitura eficiente** de botões via shift register
-- **Protocolo serial** robusto e bidirecional
-- **Display management** otimizado para TFT
+### ⚙️ **Estrutura JSON para Ações**
 
-### 📥 Upload do Firmware
+```json
+{
+  "action": {
+    "type": "tipo_selecionado",
+    "payload": "dados_ou_caminho"
+  }
+}
+```
 
-1. **Instale o Arduino IDE** ou PlatformIO
-2. **Configure o ambiente ESP32**:
+### 🎯 **Exemplos Práticos de Configuração**
 
-   - Board: ESP32 Dev Module
-   - Flash Mode: QIO
-   - Flash Frequency: 80MHz
-   - Partition Scheme: Default
+| Tipo de Ação     | Exemplo de Payload                                                              | Descrição                     |
+| :--------------- | :------------------------------------------------------------------------------ | :---------------------------- |
+| **open_program** | `"C:\\Apps\\Discord.exe"`                                                       | Abrir executável com toggle   |
+| **run_cmd**      | `"explorer shell:RecycleBinFolder"`                                             | Executar comandos Shell/CMD   |
+| **hotkey**       | `["ctrl", "shift", "z"]`                                                        | Combinação complexa de teclas |
+| **type_text**    | `"Meu e-mail é: usuario@exemplo.com"`                                           | Digitação automática de texto |
+| **macro**        | `[{"type":"hotkey","payload":"ctrl+a"},{"type":"type_text","payload":"Hello"}]` | Sequência de ações            |
+| **script**       | `"C:\\Scripts\\automacao.py"`                                                   | Executar script Python        |
 
-3. **Instale as bibliotecas necessárias**:
+### 🔄 **Protocolo de Comunicação**
 
-   - **TFT_eSPI** by Bodmer
-   - **SPI** (incluída por padrão)
-
-4. **Faça o upload** do código `Stream-Deck-Esp32.ino`
-
-## 🎯 Como Usar
-
-### 1. 🎮 Configuração dos Botões
-
-1. **Abra o software** ESP32 Deck Controller
-2. **Vá para a aba** "🎮 Configurar Botões"
-3. **Clique em "Configurar"** em qualquer botão
-4. **Defina as propriedades**:
-   - **Nome**: Até 16 caracteres
-   - **Ícone**: PNG, JPG ou extraia de executável
-   - **Ação**: Programa, URL, comando ou macro
-
-### 2. 🔌 Conexão com ESP32
-
-1. **Conecte o ESP32** via USB
-2. **Acesse a aba** "🔌 Conexão"
-3. **Selecione a porta** COM correspondente
-4. **Escolha baud rate** 115200
-5. **Clique em "Conectar"**
-
-### 3. 🎨 Personalização da Interface
-
-1. **Na aba "⚙️ Configurações"**:
-   - **Tema**: Dark, Light ou System
-   - **Esquema de cores**: 5 opções disponíveis
-   - **Tamanho da fonte**: Pequeno, Médio ou Grande
-   - **Transparência**: 50% a 100%
-
-### 4. 🔄 Sistema de Atualizações
-
-1. **Acesse a aba** "🔄 Atualização"
-2. **Clique em "Verificar"** para buscar novas versões
-3. **Siga as instruções** para atualizar quando disponível
-
-## 🔄 Protocolo de Comunicação
-
-### 📤 ESP32 → Software
+#### 📤 **ESP32 → Software**
 
 ```
 BTN:1        # Botão 1 pressionado
@@ -235,7 +233,7 @@ BTN:2        # Botão 2 pressionado
 BTN:8        # Botão 8 pressionado
 ```
 
-### 📥 Software → ESP32
+#### 📥 **Software → ESP32**
 
 ```
 CONNECTED    # Confirmação de conexão
@@ -243,9 +241,58 @@ DISCONNECT   # Solicitação de desconexão
 PING         # Teste de comunicação
 ```
 
-## 🎨 Temas de Interface do ESP32
+---
 
-### ⭐ Escolha no Código:
+## 🎯 Como Usar
+
+### 1. 🎮 **Configuração dos Botões (NOVO)**
+
+1. **Abra o software** ESP32 Deck Controller
+2. **Vá para a aba** "🎮 Configurar Botões"
+3. **Clique em "Configurar"** em qualquer botão
+4. **Use o Editor Unificado**:
+   - **Selecione o tipo de ação** no menu suspenso
+   - **Configure o payload** dinamicamente
+   - **Para macros**: Clique em "🛠️ Editar Macro" para sequenciar ações
+
+### 2. 🛠️ **Criando Macros (NOVO)**
+
+1. **Selecione "Macro"** como tipo de ação
+2. **Clique em "Editar Macro"**
+3. **Adicione ações sequenciais**:
+   - **➕ Adicionar** - Nova ação na sequência
+   - **✏️ Editar** - Modificar ação existente
+   - **🗑️ Remover** - Excluir ação
+   - **▲▼ Mover** - Reordenar sequência
+
+### 3. 🔌 **Conexão com ESP32**
+
+1. **Conecte o ESP32** via USB
+2. **Acesse a aba** "🔌 Conexão"
+3. **Selecione a porta** COM correspondente
+4. **Escolha baud rate** 115200
+5. **Clique em "Conectar"**
+
+### 4. 🎨 **Personalização da Interface**
+
+1. **Na aba "⚙️ Configurações"**:
+   - **Tema**: Dark, Light ou System
+   - **Esquema de cores**: 5 opções disponíveis
+   - **Tamanho da fonte**: Pequeno, Médio ou Grande
+   - **Transparência**: 50% a 100%
+   - **Minimizar para tray**: Mantém app rodando em segundo plano
+
+### 5. 🔄 **Sistema de Atualizações**
+
+1. **Acesse a aba** "🔄 Atualização"
+2. **Clique em "Verificar"** para buscar novas versões
+3. **Download automático** quando atualização disponível
+
+---
+
+## 🎨 Temas do ESP32
+
+### ⭐ **Escolha no Código do Firmware:**
 
 ```cpp
 // NO ARQUIVO .ino, LINHA ~380:
@@ -257,35 +304,44 @@ drawPanelCompact();    // ⭐ Opção 1 - Mais compacta
 // drawPanelClassic();    // ⭐ Opção 6 - Clássico
 ```
 
+---
+
 ## 🐛 Solução de Problemas
 
-### ❌ ESP32 Não é Detectado
+### ❌ **ESP32 Não é Detectado**
 
 - **Verifique a conexão USB**
 - **Instale drivers CH340/CP2102** se necessário
 - **Teste em outra porta USB**
 - **Reinicie o software**
 
-### ❌ Botões Não Funcionam
+### ❌ **Botões Não Funcionam**
 
 - **Confirme a fiação** do shift register
 - **Verifique os resistores** pull-up
 - **Teste a comunicação serial** com monitor serial
 - **Valide o baud rate** (115200)
 
-### ❌ Display Não Acende
+### ❌ **Ações Não Executam**
+
+- **Verifique se PyAutoGUI está instalado** para hotkeys e digitação
+- **Confirme caminhos absolutos** para programas e scripts
+- **Teste ações individualmente** antes de criar macros
+
+### ❌ **Display Não Acende**
 
 - **Confirme a alimentação** 3.3V
 - **Verifique as conexões SPI**
 - **Ajuste as definições** do TFT_eSPI
 - **Teste com exemplo** básico da biblioteca
 
-### ❌ Ícones Não Carregam
+### ❌ **Macros Não Funcionam**
 
-- **Verifique o formato** (PNG, JPG, ICO)
-- **Confirme o caminho** do arquivo
-- **Tente extrair ícone** do executável
-- **Reinicie o software**
+- **Verifique a sintaxe JSON** das sub-ações
+- **Teste cada ação** individualmente na macro
+- **Ajuste delays** entre ações se necessário
+
+---
 
 ## 📄 Licença
 
@@ -296,19 +352,19 @@ Distribuído sob licença MIT. Veja `LICENSE` para mais informações.
 **Luiz F. R. Pimentel**
 
 - GitHub: [@KanekiZLF](https://github.com/KanekiZLF)
-- LinkdIn: [@Luiz F. R. Pimentel](https://www.linkedin.com/in/luiz-fernando-rocha-pimentel)
+- LinkedIn: [Luiz F. R. Pimentel](https://www.linkedin.com/in/luiz-fernando-rocha-pimentel)
 - Projeto: [ESP32 Deck Controller](https://github.com/KanekiZLF/Stream-Deck-Esp32)
 
 ---
 
 <div align="center">
 
-### 🚀 **Sistema Completo: Hardware + Software + Interface**
+### 🚀 **Sistema Completo: Hardware + Software + Automação**
 
 ### ⭐ **Se este projeto te ajudou, deixe uma estrela no repositório!**
 
 **Desenvolvido com muito ☕ por Luiz F. R. Pimentel**
 
-[⬆ Voltar ao topo](#-esp32-deck-controller)
+[⬆ Voltar ao topo](#-esp32-deck-controller-v200)
 
 </div>
