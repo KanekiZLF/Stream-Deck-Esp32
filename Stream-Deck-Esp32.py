@@ -10,7 +10,9 @@ import subprocess
 import webbrowser
 import platform
 import traceback
-from dataclasses import dataclass, field
+import socket
+import select
+from dataclasses import dataclass
 from typing import Dict, Any, Optional, Callable, List
 
 # Windows API
@@ -18,6 +20,7 @@ try:
     import win32gui
     import win32con
     import win32process
+    import win32ui
     WINDOWS_AVAILABLE = platform.system() == 'Windows'
 except ImportError:
     WINDOWS_AVAILABLE = False
@@ -25,7 +28,7 @@ except ImportError:
 # GUI libs
 import customtkinter as ctk
 import tkinter as tk
-from tkinter import filedialog, messagebox, simpledialog 
+from tkinter import filedialog, messagebox, simpledialog, colorchooser 
 from PIL import Image, ImageTk, ImageDraw
 
 # Serial
@@ -46,7 +49,7 @@ try:
     import pyautogui
     PYAUTOGUI_AVAILABLE = True
 except Exception:
-    PYAUTOGUI_AVAILABLE = False
+    REQUESTS_AVAILABLE = False
 
 try:
     import psutil
@@ -67,15 +70,15 @@ except ImportError:
 CONFIG_FILE = "Esp32_deck_config.json"
 ICON_FOLDER = "icons"
 LOG_FILE = "Esp32_deck.log"
-APP_VERSION = "2.0.0"
+APP_VERSION = "3.2.0" # Versão atualizada
 APP_NAME = "Esp32 Deck Controller"
 APP_ICON_NAME = "app_icon.ico"
 DEVELOPER = "Luiz F. R. Pimentel"
 GITHUB_URL = "https://github.com/KanekiZLF/Stream-Deck-Esp32"
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/KanekiZLF/Stream-Deck-Esp32/refs/heads/main/version.txt"
 DEFAULT_SERIAL_BAUD = 115200
-BUTTON_COUNT = 8
-ICON_SIZE = (64, 64)
+BUTTON_COUNT = 16
+ICON_SIZE = (80, 80) 
 
 # Tipos de Ação e seus nomes amigáveis para a UI
 ACTION_TYPES = {
@@ -160,11 +163,11 @@ class Logger:
         should_save = False
         if level == "ERROR":
             should_save = True
-        elif "Fechando aplicação" in msg or "Porta serial fechada" in msg:
+        elif "Fechando aplicação" in msg or "Porta serial fechada" in msg or "Conexão Wi-Fi fechada" in msg:
             should_save = True
         
         # Otimização: Apenas salva log crítico e informações de sessão/serial
-        if should_save or level == "ERROR" or "Fechando aplicação" in msg or "Porta serial fechada" in msg:
+        if should_save or level == "ERROR" or "Fechando aplicação" in msg or "Porta serial fechada" in msg or "Conexão Wi-Fi fechada" in msg:
             self._write_file(entry)
             
         if self.textbox:
@@ -200,20 +203,29 @@ class ConfigManager:
         buttons = {}
         for i in range(1, BUTTON_COUNT + 1):
             buttons[str(i)] = {
-                "label": f"Botão {i}",
+                "label": "",
                 "icon": "",
+                "led_color": "#FFFFFF", 
                 "action": {"type": "none", "payload": ""}
             }
         return {
             "version": APP_VERSION,
             "buttons": buttons,
-            "serial": {"port": "", "baud": DEFAULT_SERIAL_BAUD},
+            "serial": {
+                "type": "Serial", # NOVO: Tipo de conexão padrão
+                "port": "", 
+                "baud": DEFAULT_SERIAL_BAUD
+            },
+            "wifi": { # NOVO: Configurações de Wi-Fi
+                "ip": "192.168.1.100", 
+                "port": 8000
+            },
             "appearance": {
                 "theme": "System", 
                 "icon_size": ICON_SIZE[0],
                 "minimize_to_tray": False,
                 "font_size": "Médio",
-                "color_scheme": "Padrão" # Adicionando default color scheme
+                "color_scheme": "Padrão" 
             },
             "update": {"check_url": UPDATE_CHECK_URL}
         }
@@ -230,11 +242,31 @@ class ConfigManager:
                     data['buttons'] = default_config['buttons']
                 if 'appearance' not in data:
                     data['appearance'] = default_config['appearance']
+                if 'serial' not in data:
+                    data['serial'] = default_config['serial']
+                if 'wifi' not in data: # Adicionando Wi-Fi
+                    data['wifi'] = default_config['wifi']
+                
                 # Sub-chaves de appearance
                 for key, default_val in default_config['appearance'].items():
                     if key not in data['appearance']:
                         data['appearance'][key] = default_val
                 
+                # Sub-chaves de serial
+                for key, default_val in default_config['serial'].items():
+                    if key not in data['serial']:
+                        data['serial'][key] = default_val
+                
+                # Sub-chaves de wifi
+                for key, default_val in default_config['wifi'].items():
+                    if key not in data['wifi']:
+                        data['wifi'][key] = default_val
+
+                # Adiciona led_color se estiver faltando em botões existentes
+                for key in data['buttons']:
+                    if 'led_color' not in data['buttons'][key]:
+                        data['buttons'][key]['led_color'] = default_config['buttons'][key]['led_color']
+
                 return data
             except Exception:
                 return default_config
@@ -329,41 +361,92 @@ class IconLoader:
             return self.load_icon_from_path(ico_candidate)
         return None
 
-    def extract_icon_to_png(self, exe_path: str, out_png_path: str, size: int = 256) -> Optional[str]:
+    def extract_icon_to_png(self, exe_path: str, out_png_path: str, size: int = 128) -> Optional[str]: 
+        """
+        Implementação revisada para evitar "Select bitmap object failed" 
+        e melhorar o tratamento de transparência (canal alfa) e qualidade.
+        """
         if not WINDOWS_AVAILABLE: return None
+        
+        # Variáveis de limpeza
+        large = []
+        small = []
+        hbmp = None
+        hdc_mem = None
+        temp_bmp = out_png_path + ".bmp"
+        
         try:
-            import win32ui # type: ignore
+            # 1. Extração do Handle do Ícone
             large, small = win32gui.ExtractIconEx(exe_path, 0)
             hicon = large[0] if large and len(large) > 0 else small[0] if small and len(small) > 0 else None
             
             if not hicon: return None
 
-            hdc = win32ui.CreateDCFromHandle(win32gui.GetDC(0))
-            hbmp = win32ui.CreateBitmap()
-            hbmp.CreateCompatibleBitmap(hdc, size, size)
-            hdc_mem = hdc.CreateCompatibleDC()
-            hdc_mem.SelectObject(hbmp)
+            # 2. Configuração do Device Context (DC) e Bitmap (BMB)
+            hdc_screen = win32ui.CreateDCFromHandle(win32gui.GetDC(0))
+            hdc_mem = hdc_screen.CreateCompatibleDC()
             
+            hbmp = win32ui.CreateBitmap()
+            hbmp.CreateCompatibleBitmap(hdc_screen, size, size)
+            
+            # Seleciona o Bitmap no DC de memória
+            hbmp_old = hdc_mem.SelectObject(hbmp)
+            
+            # 3. Desenho do Ícone
             win32gui.DrawIconEx(hdc_mem.GetSafeHdc(), 0, 0, hicon, size, size, 0, None, win32con.DI_NORMAL)
             
-            temp_bmp = out_png_path + ".bmp"
+            # 4. Salvamento temporário do Bitmap
             hbmp.SaveBitmapFile(hdc_mem, temp_bmp)
             
+            # 5. Processamento com PIL para transparência
             img = Image.open(temp_bmp).convert("RGBA")
+            
+            # Tenta remover o fundo (geralmente branco/cinza claro do DrawIconEx)
+            try:
+                bg_color = img.getpixel((0, 0))
+                
+                if bg_color[0] > 200 and bg_color[1] > 200 and bg_color[2] > 200:
+                    data = img.getdata()
+                    new_data = []
+                    for item in data:
+                        if item[0] == bg_color[0] and item[1] == bg_color[1] and item[2] == bg_color[2]:
+                            new_data.append((255, 255, 255, 0)) # Transparente
+                        else:
+                            new_data.append(item)
+                    img.putdata(new_data)
+                    
+            except Exception:
+                 pass 
+
+            # Redimensiona e salva como PNG
             img = img.resize((size, size), Image.LANCZOS)
             img.save(out_png_path, "PNG")
             
-            try: os.remove(temp_bmp)
-            except Exception: pass
+            return out_png_path
+        
+        except Exception as e:
+            # Captura exceções, incluindo a win32ui.error
+            print(f"Erro ao extrair ícone do EXE: {e}\n{traceback.format_exc()}")
+            return None
             
-            try: 
+        finally:
+            # 6. Limpeza de Recursos (IMPORTANTE!)
+            try:
+                if hdc_mem and 'hbmp_old' in locals():
+                    hdc_mem.SelectObject(hbmp_old)
+                if hbmp: 
+                    win32gui.DeleteObject(hbmp.GetHandle())
+                if hdc_mem: 
+                    hdc_mem.DeleteDC()
                 for h in large: win32gui.DestroyIcon(h)
                 for h in small: win32gui.DestroyIcon(h)
-            except Exception: pass
+            except Exception:
+                pass
             
-            return out_png_path
-        except Exception:
-            return None
+            # Remove o arquivo .bmp temporário
+            if os.path.exists(temp_bmp):
+                try: os.remove(temp_bmp)
+                except: pass
 
 # -----------------------------
 # Tray Icon Manager
@@ -721,7 +804,7 @@ class MacroEditorDialog(ctk.CTkToplevel):
         
         self.logger = logger
         self.title("Editor de Macro")
-        self.geometry("600x500")
+        self.geometry("600x580")
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
@@ -803,8 +886,8 @@ class MacroEditorDialog(ctk.CTkToplevel):
         inner_save_buttons_frame = ctk.CTkFrame(save_frame, fg_color="transparent")
         inner_save_buttons_frame.pack(expand=True)
         
-        ctk.CTkButton(inner_save_buttons_frame, text="🚫 Cancelar", command=self.destroy, fg_color="#6c757d").pack(side='left', padx=(10, 0))
-        ctk.CTkButton(inner_save_buttons_frame, text="💾 Salvar Macro", command=self._save_and_close, fg_color=COLORS["success"]).pack(side='left')
+        ctk.CTkButton(inner_save_buttons_frame, text='🚫 Cancelar', command=self.destroy, fg_color="#6c757d").pack(side='left', padx=(10, 0))
+        ctk.CTkButton(inner_save_buttons_frame, text='💾 Salvar Macro', command=self._save_and_close, fg_color=COLORS["success"]).pack(side='left')
 
     def _populate_list(self):
         self.listbox.delete(0, tk.END)
@@ -903,15 +986,18 @@ class ButtonConfigDialog(ctk.CTkToplevel):
         self.logger = logger
         self._newly_created_icon = None
         self.title(f'Configurar Botão {button_key}')
-        self.geometry('550x500') # Aumentado para acomodar o menu de ação
+        self.geometry('550x580') # Aumentado para acomodar o menu de ação
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
         self._center_window()
         self.protocol("WM_DELETE_WINDOW", self._on_cancel)
-        
+        initial_label = self.conf.get('label', f'Botão {button_key}')
+        if initial_label == f'Botão {button_key}':
+            initial_label = ""
         self.label_var = tk.StringVar(value=self.conf.get('label', f'Botão {button_key}'))
         self.icon_path = self.conf.get('icon', '')
+        self.led_color_var = tk.StringVar(value=self.conf.get('led_color', '#FFFFFF')) # Cor do LED
         self._initial_action_type = self.conf.get('action', {}).get('type', 'none')
         self._initial_payload = self.conf.get('action', {}).get('payload', '')
         
@@ -930,11 +1016,12 @@ class ButtonConfigDialog(ctk.CTkToplevel):
         main_frame.pack(fill='both', expand=True, padx=15, pady=15)
         
         # Nome do Botão
-        ctk.CTkLabel(main_frame, text='Nome do Botão:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', pady=(5, 0), padx=5)
+        ctk.CTkLabel(main_frame, text='Nome do Botão (Opcional):', font=ctk.CTkFont(weight="bold")).pack(anchor='w', pady=(5, 0), padx=5)
         def on_name_change(*args):
             if len(self.label_var.get()) > 16: self.label_var.set(self.label_var.get()[:16])
         self.label_var.trace('w', on_name_change)
-        ctk.CTkEntry(main_frame, textvariable=self.label_var, width=400, placeholder_text="Máximo 16 caracteres").pack(fill='x', pady=5, padx=5)
+        # MODIFICAÇÃO: Adiciona um placeholder mais útil
+        ctk.CTkEntry(main_frame, textvariable=self.label_var, width=400, placeholder_text="Deixe vazio para mostrar apenas o ícone").pack(fill='x', pady=5, padx=5)
         
         # Ícone e Programa (Frame)
         icon_frame = ctk.CTkFrame(main_frame, corner_radius=8, border_width=1, border_color="#555")
@@ -950,6 +1037,26 @@ class ButtonConfigDialog(ctk.CTkToplevel):
         btn_frame = ctk.CTkFrame(icon_content, fg_color="transparent")
         btn_frame.pack(side='left', padx=10)
         ctk.CTkButton(btn_frame, text='Escolher Ícone', width=140, command=self._choose_icon).pack(side='top', padx=5, pady=(0, 5))
+        
+        # --- Configuração do LED ---
+        led_frame = ctk.CTkFrame(main_frame, corner_radius=8)
+        led_frame.pack(fill='x', pady=5)
+        
+        ctk.CTkLabel(led_frame, text='Cor do LED do Botão:', font=ctk.CTkFont(weight="bold")).pack(anchor='w', padx=10, pady=(10, 5))
+        
+        led_input_frame = ctk.CTkFrame(led_frame, fg_color="transparent")
+        led_input_frame.pack(fill='x', padx=10, pady=(0, 10))
+
+        # Adiciona o seletor de cor nativo (tk.colorchooser)
+        self.color_entry = ctk.CTkEntry(led_input_frame, textvariable=self.led_color_var, width=150, height=35, placeholder_text="#RRGGBB")
+        self.color_entry.pack(side='left', padx=(0, 10))
+        
+        # Pré-visualização de Cor
+        self.color_preview = ctk.CTkLabel(led_input_frame, text="  ", width=30, height=30, corner_radius=5, fg_color=self.led_color_var.get())
+        self.color_preview.pack(side='left')
+        
+        # O tkinter é necessário para o seletor de cor nativo
+        ctk.CTkButton(led_input_frame, text="Seletor de Cor", command=self._open_color_picker, width=120).pack(side='left', padx=10)
         
         # Ação (Tipo e Payload)
         action_frame = ctk.CTkFrame(main_frame, corner_radius=8)
@@ -1072,7 +1179,8 @@ class ButtonConfigDialog(ctk.CTkToplevel):
                 basename = os.path.splitext(os.path.basename(path))[0]
                 safe_makedirs(ICON_FOLDER)
                 out_png = os.path.join(ICON_FOLDER, f"btn{self.button_key}_{basename}.png")
-                extracted = self.icon_loader.extract_icon_to_png(path, out_png, size=128)
+                # Usa o novo tamanho de 128 para melhor qualidade antes de redimensionar
+                extracted = self.icon_loader.extract_icon_to_png(path, out_png, size=128) 
                 if extracted:
                     self._newly_created_icon = extracted
                     self.icon_path = extracted
@@ -1127,6 +1235,17 @@ class ButtonConfigDialog(ctk.CTkToplevel):
             self.icon_preview.configure(image=None, text='📱')
             self.icon_preview.image = None
 
+    def _open_color_picker(self):
+        """Abre o seletor de cores nativo e atualiza o campo e a pré-visualização no diálogo de configuração."""
+        color_code = colorchooser.askcolor(title="Escolha a Cor do LED")
+        
+        if color_code and color_code[1]:
+            hex_color = color_code[1].upper()
+            self.led_color_var.set(hex_color)
+            self.color_entry.delete(0, 'end')
+            self.color_entry.insert(0, hex_color)
+            self.color_preview.configure(fg_color=hex_color) # Atualiza a pré-visualização
+
     def _on_cancel(self):
         if self._newly_created_icon and os.path.exists(self._newly_created_icon):
             try: 
@@ -1150,8 +1269,9 @@ class ButtonConfigDialog(ctk.CTkToplevel):
             
             # 1. Limpa a configuração do botão no ConfigManager
             self.parent.config.data['buttons'][self.button_key] = {
-                "label": f"Botão {self.button_key}",
+                "label": "", 
                 "icon": "",
+                "led_color": "#FFFFFF", # RESETANDO A COR DO LED
                 "action": {"type": "none", "payload": ""}
             }
             
@@ -1215,6 +1335,7 @@ class ButtonConfigDialog(ctk.CTkToplevel):
         self.conf['label'] = self.label_var.get()
         self.conf['icon'] = self.icon_path
         self.conf['action'] = {'type': action_type, 'payload': payload}
+        self.conf['led_color'] = self.led_color_var.get() # SALVANDO A COR DO LED
         
         self.parent.config.data['buttons'][self.button_key] = self.conf
         self.parent.config.save()
@@ -1223,6 +1344,9 @@ class ButtonConfigDialog(ctk.CTkToplevel):
         self.parent._reset_icon_loader()
         self.parent.refresh_all_buttons()
         
+        # Envia a cor do LED (se conectado)
+        self.parent._send_led_color_command(self.button_key, self.conf['led_color'])
+            
         self.destroy()
 
     def _test_action(self):
@@ -1260,15 +1384,33 @@ class ButtonConfigDialog(ctk.CTkToplevel):
 class SerialManager:
     def __init__(self, config: ConfigManager, logger: Logger, 
                  on_message: Optional[Callable[[str], None]] = None,
-                 on_status_change: Optional[Callable[[bool], None]] = None):
+                 on_status_change: Optional[Callable[[bool, str], None]] = None):
         self.config = config
         self.logger = logger
         self.on_message = on_message
-        self.on_status_change = on_status_change
+        # Atualizado para aceitar 'connection_type'
+        self.on_status_change = on_status_change 
         self._serial: Optional[serial.Serial] = None
         self._thread: Optional[threading.Thread] = None
         self._running = False
         self._is_connected = False
+        self.connection_type = "Serial"
+        # O self.connection_type não será alterado, pois ele define a lógica interna
+        # se é serial (COM) ou Wi-Fi. A mudança para 'USB' é apenas cosmética na UI.
+
+    @property
+    def is_connected(self):
+        return self._is_connected
+        
+    def send_command(self, command: str):
+        if self._is_connected and self._serial and self._serial.is_open:
+            try:
+                self._serial.write((command + "\n").encode('utf-8')) # Adicionado \n
+                return True
+            except Exception as e:
+                self.logger.error(f"Erro ao enviar comando serial: {e}")
+                return False
+        return False
 
     def is_port_available(self, port: str) -> bool:
         try:
@@ -1281,39 +1423,34 @@ class SerialManager:
     def list_ports(self) -> List[str]:
         return [p.device for p in serial.tools.list_ports.comports()]
 
-    def send_disconnect_command(self):
-        try:
-            if self._serial and self._serial.is_open:
-                self._serial.write(b"DISCONNECT\n")
-                time.sleep(0.3)
-                return True
-        except Exception: pass
-        return False
-
     def disconnect(self):
         try:
-            if self._is_connected: self.send_disconnect_command()
             self._running = False
             self._is_connected = False
             if self._serial and self._serial.is_open:
+                # Envia um comando de desconexão antes de fechar a porta
+                try: self._serial.write(b"DISCONNECT\n")
+                except Exception: pass 
                 self._serial.close()
                 self.logger.info('🔌 Porta serial fechada')
-            if self.on_status_change: self.on_status_change(False)
+            if self.on_status_change: self.on_status_change(False, self.connection_type)
         except Exception as e: self.logger.warn(f'⚠️ Erro ao fechar serial: {e}')
 
     def connect(self, port: str, baud: int = DEFAULT_SERIAL_BAUD):
         try:
             if not self.is_port_available(port): return False
             if self._serial and self._serial.is_open: self.disconnect()
+            
             self._serial = serial.Serial(port=port, baudrate=baud, timeout=1, write_timeout=1)
             time.sleep(2)
             self._running = True
             self._is_connected = True
             self._thread = threading.Thread(target=self._reader_loop, daemon=True)
             self._thread.start()
-            self._serial.write(b"CONNECTED\n")
+            
+            self.send_command("CONNECTED")
             self.logger.info(f'✅ Conectado a {port} @ {baud}')
-            if self.on_status_change: self.on_status_change(True)
+            if self.on_status_change: self.on_status_change(True, self.connection_type)
             return True
         except Exception as e:
             self.logger.error(f'❌ Falha ao conectar serial: {e}')
@@ -1333,8 +1470,172 @@ class SerialManager:
         finally:
             self._running = False
             self._is_connected = False
-            if self.on_status_change: self.on_status_change(False)
+            if self.on_status_change: self.on_status_change(False, self.connection_type)
             self.logger.warn("Loop de leitura serial interrompido.")
+
+# -----------------------------
+# Wifi Manager
+# -----------------------------
+class WifiManager:
+    def __init__(self, logger: Logger, 
+                 on_message: Optional[Callable[[str], None]] = None,
+                 on_status_change: Optional[Callable[[bool, str], None]] = None):
+        
+        self.logger = logger
+        self.on_message = on_message
+        self.on_status_change = on_status_change
+        self._socket: Optional[socket.socket] = None
+        self._thread: Optional[threading.Thread] = None
+        self._running = False
+        self._is_connected = False
+        self.host = ""
+        self.port = 0
+        self.connection_type = "Wi-Fi"
+        self.read_buffer = ""
+        
+    @property
+    def is_connected(self):
+        return self._is_connected
+
+    def send_command(self, command: str) -> bool:
+        if self._is_connected and self._socket:
+            try:
+                self._socket.sendall((command + "\n").encode('utf-8'))
+                return True
+            except Exception as e:
+                self.logger.error(f"Erro ao enviar comando Wi-Fi: {e}")
+                self.disconnect() # Desconecta se falhar o envio
+                return False
+        return False
+
+    def connect(self, host: str, port: int) -> bool:
+        self.disconnect() # Garante que está desconectado antes de tentar
+        self.host = host
+        self.port = port
+        
+        self.logger.info(f"Conectando via Wi-Fi em {host}:{port}...")
+        
+        try:
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            # Define um timeout para a tentativa de conexão
+            self._socket.settimeout(3) 
+            self._socket.connect((host, port))
+            self._socket.settimeout(None) # Remove o timeout para a thread de leitura
+            
+            self._running = True
+            self._is_connected = True
+            self._thread = threading.Thread(target=self._reader_loop, daemon=True)
+            self._thread.start()
+            
+            self.send_command("CONNECTED") # Envia mensagem de conexão
+            
+            self.logger.info(f'✅ Conectado via Wi-Fi a {host}:{port}')
+            if self.on_status_change: self.on_status_change(True, self.connection_type)
+            return True
+            
+        except Exception as e:
+            self.logger.error(f'❌ Falha ao conectar Wi-Fi: {e}')
+            self._is_connected = False
+            if self.on_status_change: self.on_status_change(False, self.connection_type)
+            return False
+
+    def disconnect(self):
+        self._running = False
+        self._is_connected = False
+        if self._socket:
+            try:
+                self.send_command("DISCONNECT") # Tenta enviar antes de fechar
+            except Exception: pass
+            
+            try:
+                self._socket.close()
+                self.logger.info('🔌 Conexão Wi-Fi fechada')
+            except Exception: pass
+            
+        if self.on_status_change: self.on_status_change(False, self.connection_type)
+
+    def _reader_loop(self):
+        try:
+            while self._running and self._socket:
+                try:
+                    # Usa 'select' para non-blocking read
+                    ready_to_read, _, _ = select.select([self._socket], [], [], 0.1)
+                    
+                    if ready_to_read:
+                        data = self._socket.recv(1024)
+                        if not data:
+                            self.logger.warn("Conexão Wi-Fi fechada pelo host remoto.")
+                            break # Sai do loop se não receber dados
+                            
+                        self.read_buffer += data.decode('utf-8', errors='ignore')
+                        
+                        # Processa linhas completas (separadas por '\n')
+                        while '\n' in self.read_buffer:
+                            line, self.read_buffer = self.read_buffer.split('\n', 1)
+                            line = line.strip()
+                            if line:
+                                self.logger.debug(f'📨 Recebido Wi-Fi: {line}')
+                                if self.on_message: self.on_message(line)
+
+                    time.sleep(0.01) # Pequeno sleep para evitar uso excessivo da CPU
+                        
+                except socket.timeout:
+                    # Timeout do select (não é um erro)
+                    continue
+                except socket.error as e:
+                    self.logger.error(f"Erro de socket Wi-Fi: {e}")
+                    break
+                except Exception as e:
+                    self.logger.error(f"Erro inesperado no loop Wi-Fi: {e}")
+                    break
+        finally:
+            self.disconnect() 
+
+    def search_device(self) -> Optional[str]:
+        """
+        Tenta encontrar o ESP32 Deck usando UDP Broadcast.
+        O ESP32 deve responder a uma mensagem UDP específica.
+        """
+        UDP_PORT = 4210 # Porta de broadcast (a ser definida no ESP32)
+        BROADCAST_IP = '255.255.255.255'
+        MESSAGE = b"ESP32_DECK_DISCOVER"
+        RESPONSE_TIMEOUT = 2 
+
+        try:
+            # 1. Cria socket UDP
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            client_socket.settimeout(RESPONSE_TIMEOUT)
+            
+            self.logger.info(f"Enviando broadcast UDP para {BROADCAST_IP}:{UDP_PORT}")
+            
+            # 2. Envia a mensagem de broadcast
+            client_socket.sendto(MESSAGE, (BROADCAST_IP, UDP_PORT))
+            
+            # 3. Espera pela resposta
+            while True:
+                try:
+                    data, server_address = client_socket.recvfrom(1024)
+                    
+                    if data.decode('utf-8', errors='ignore').strip() == "ESP32_DECK_ACK":
+                        client_ip = server_address[0]
+                        self.logger.info(f"Resposta recebida de {client_ip}")
+                        return client_ip
+                    
+                except socket.timeout:
+                    self.logger.info("Tempo limite de busca Wi-Fi atingido.")
+                    return None
+                except Exception as e:
+                    self.logger.error(f"Erro durante a busca UDP: {e}")
+                    return None
+                    
+        except Exception as e:
+            self.logger.error(f"Falha ao inicializar a busca UDP: {e}")
+            return None
+        finally:
+            try: client_socket.close()
+            except: pass
+
 
 # -----------------------------
 # Update Checker
@@ -1457,7 +1758,7 @@ class Esp32DeckApp(ctk.CTk):
         
         ctk.deactivate_automatic_dpi_awareness()
         self.title(f'{APP_NAME} v{APP_VERSION}')
-        self.geometry('900x700')
+        self.geometry('750x700')
         self.resizable(False, False)
         
         self._setup_app_icon()
@@ -1473,12 +1774,19 @@ class Esp32DeckApp(ctk.CTk):
         
         self.action_manager = ActionManager(self.logger)
         
+        # 3. Inicializa os managers de conexão
         self.serial_manager = SerialManager(
             self.config, 
             self.logger, 
             on_message=self._on_serial_message,
             on_status_change=self._update_header_status
         )
+        self.wifi_manager = WifiManager(
+            self.logger,
+            on_message=self._on_wifi_message,
+            on_status_change=self._update_header_status
+        )
+        
         self.update_checker = UpdateChecker(self.config, self.logger)
         
         self.tray_manager = TrayIconManager(self, self.logger)
@@ -1493,6 +1801,39 @@ class Esp32DeckApp(ctk.CTk):
         
         ctk.set_appearance_mode(self.config.data.get('appearance', {}).get('theme', 'System'))
         
+        # --- CORREÇÃO DE ERRO: Inicializar referências antes de construir UI ---
+        # Componentes referenciados em _build_header e _build_connection_tab
+        self.header_status_dot = None
+        self.header_status_text = None
+        self.status_card = None
+        self.dash_icon = None
+        self.dash_status_text = None
+        self.dash_sub_text = None
+        self.details_frame = None
+        self.lbl_detail_port = None
+        self.lbl_detail_baud = None
+        self.lbl_detail_proto = None
+        self.connect_btn = None
+        self.disconnect_btn = None
+        self.port_option = None
+        self.baud_option = None
+        self.refresh_ports_btn = None
+        self.ip_entry = None
+        self.port_entry = None
+        self.search_btn = None
+        self.centering_frame = None
+        self.remote_version_var = tk.StringVar(value=APP_VERSION) # Inicializa para a aba de Update
+        self.remote_card_frame = None
+        self.last_check_label = None
+        self.check_update_btn = None
+        self.status_icon_label = None
+        self.status_title_label = None
+        self.status_detail_label = None
+        self.connection_type_var = tk.StringVar(value=self.config.data.get('serial', {}).get('type', 'Serial'))
+        # NOVO: Textbox de Detalhes da Conexão
+        self.connection_details_textbox = None
+        # Fim da correção de inicialização
+        
         self._build_ui()
         self._load_appearance_settings() # Deve vir após _build_ui
         
@@ -1503,6 +1844,13 @@ class Esp32DeckApp(ctk.CTk):
         self.update_serial_ports()
         
         self.bind("<Unmap>", self._on_minimize_event)
+
+        # Determina o estado de conexão inicial
+        initial_conn_type = self.connection_type_var.get()
+        is_connected = self.serial_manager.is_connected or self.wifi_manager.is_connected # Verifica o estado real
+
+        # A chamada visual é feita aqui no final do __init__
+        self._set_header_visuals(is_connected, initial_conn_type)
 
         atexit.register(self._cleanup_on_exit)
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -1529,6 +1877,23 @@ class Esp32DeckApp(ctk.CTk):
             except Exception as e:
                 print(f"Aviso: Não foi possível definir ícone da janela: {e}")
 
+    def _make_clickable(self, widget, command):
+        """Liga o evento de clique e define o cursor para o widget e todos os seus filhos."""
+        
+        # 1. Configura o cursor (Crucial para a UX)
+        widget.configure(cursor="hand2")
+        
+        # 2. Liga o comando de clique
+        widget.bind('<Button-1>', lambda event: self.after(0, command))
+        
+        # 3. Recorre para os filhos, garantindo cursor e clique
+        for child in widget.winfo_children():
+            
+            child.configure(cursor="hand2")
+            child.bind('<Button-1>', lambda event, w=widget: self.after(0, command))
+        
+            self._make_clickable(child, command)
+
     def _on_minimize_event(self, event):
         if event.widget == self and self.state() == 'iconic':
             minimize_to_tray = self.config.data.get('appearance', {}).get('minimize_to_tray', False)
@@ -1551,6 +1916,8 @@ class Esp32DeckApp(ctk.CTk):
         try:
             self.logger.info("🚪 Fechando aplicação...")
             if hasattr(self, 'serial_manager'): self.serial_manager.disconnect()
+            if hasattr(self, 'wifi_manager'): self.wifi_manager.disconnect()
+            
             if hasattr(self, 'config'): 
                 self.config.data['version'] = APP_VERSION # Garante que a versão atual está salva
                 self.config.save()
@@ -1569,19 +1936,48 @@ class Esp32DeckApp(ctk.CTk):
         try:
             if isinstance(widget, ctk.CTkButton):
                 text = widget.cget("text")
-                if text in ["💾 Salvar", "🔗 Conectar", "💾 Salvar Macro", "💾 Salvar Ação"]: 
-                    widget.configure(fg_color=self.colors["success"], hover_color=self.colors["success"] if self.colors["success"] != COLORS["success"] else "#1e7a30")
-                elif text in ["🗑️ Excluir", "🔓 Desconectar"]: 
-                    widget.configure(fg_color=self.colors["danger"], hover_color=self.colors["danger"] if self.colors["danger"] != COLORS["danger"] else "#a92a39")
-                elif text in ["▶️ Testar"]:
-                    widget.configure(fg_color=self.colors["primary"], hover_color=self.colors["secondary"])
-                elif text in ["🚫 Cancelar"]: 
-                    widget.configure(fg_color="#6c757d", hover_color="#5a6268")
+
+                # Botões de Sucesso (Verde)
+                if text in ["💾 Salvar", "🔗 Conectar", "💾 Salvar Macro", "💾 Salvar Ação", "⚡ Aplicar Cor", "Ligar Todos"]: 
+                    fg = self.colors["success"]
+                    # Usa 'success_hover' ou volta para a cor 'success' se a chave não existir
+                    hv = self.colors.get("success_hover", fg) 
+                    widget.configure(fg_color=fg, hover_color=hv)
+                
+                # Botões de Perigo (Vermelho)
+                elif text in ["🗑️ Excluir", "🔓 Desconectar", "Desligar Todos"]: 
+                    fg = self.colors["danger"]
+                    # Usa 'danger_hover' ou volta para a cor 'danger' se a chave não existir
+                    hv = self.colors.get("danger_hover", fg)
+                    widget.configure(fg_color=fg, hover_color=hv)
+                
+                # Botões de Aviso (Amarelo)
                 elif text in ["🔄 Atualizar", "🔄 Restaurar Configurações Padrão", "🔄 Atualizar Portas", "⬇️ Baixar Atualização"]: 
-                    widget.configure(fg_color=self.colors["warning"], text_color="black" if ctk.get_appearance_mode() == "Light" else "white", hover_color=self.colors["warning"] if self.colors["warning"] != COLORS["warning"] else "#d9a100")
+                    fg = self.colors["warning"]
+                    hv = self.colors.get("warning_hover", fg)
+                    # Força text_color para garantir contraste
+                    txt_color = "black" if ctk.get_appearance_mode() == "Light" else "white"
+                    widget.configure(fg_color=fg, hover_color=hv, text_color=txt_color)
+
+                # Botões Primários (Azul - Inclui Testar, Efeitos e Paleta de Cores)
+                elif text in ["▶️ Testar", "Efeito Arco-Íris 🌈", "Efeito Piscante ✨", "🎨", "ℹ️ Sobre", "🔍 Buscar"]:
+                    fg = self.colors["primary"]
+                    # Usa 'primary_hover' ou volta para a cor 'secondary' (como padrão)
+                    hv = self.colors.get("primary_hover", self.colors.get("secondary", fg)) 
+                    widget.configure(fg_color=fg, hover_color=hv)
+                
+                # Botões de Cancelar (Cinza)
+                elif text in ["🚫 Cancelar"]: 
+                    # Usando cores fixas, pois não estão na paleta principal (opcional: criar 'cancel' na paleta)
+                    widget.configure(fg_color="#6c757d", hover_color="#5a6268")
+                
+                # Fallback para botões não listados
                 else: 
-                    widget.configure(fg_color=self.colors["primary"], hover_color=self.colors["secondary"])
+                    fg = self.colors["primary"]
+                    hv = self.colors.get("secondary", fg)
+                    widget.configure(fg_color=fg, hover_color=hv)
             
+            # Atualização de Frames e Fontes (Mantido)
             elif isinstance(widget, ctk.CTkFrame):
                 if widget.cget("border_width") > 0: widget.configure(border_color=self.colors["secondary"])
             
@@ -1626,15 +2022,54 @@ class Esp32DeckApp(ctk.CTk):
         self.config.save()
 
     def _on_color_scheme_change(self, value):
+        # Paletas de cores, incluindo hover_color para botões críticos e primários.
         palettes = {
-            "Padrão": {"primary": "#2B5B84", "secondary": "#3D8BC2", "success": "#28A745", "danger": "#DC3545", "warning": "#FFC107"},
-            "Moderno": {"primary": "#000981", "secondary": "#4527A0", "success": "#0D8040", "danger": "#C62828", "warning": "#915E00"},
-            "Vibrante": {"primary": "#FF007F", "secondary": "#00D4FF", "success": "#39FF14", "danger": "#FF0033", "warning": "#FFE600"},
-            "Suave": {"primary": "#C0A9F7", "secondary": "#6C7BB1", "success": "#69F9A6", "danger": "#FF6C6C", "warning": "#FAF48B"},
-            "Escuro Total": {"primary": "#3C4043", "secondary": "#191C1F", "success": "#2E7D32", "danger": "#C62828", "warning": "#EF6C00"}
+            "Padrão": {
+                "primary": "#2B5B84", "primary_hover": "#22496b", # Hover Primary
+                "secondary": "#3D8BC2", "secondary_hover": "#3174a6", # Hover Secondary
+                "success": "#28A745", "success_hover": "#1e7e34", # Hover Success
+                "warning": "#FFC107", "warning_hover": "#d9a100", # Hover Warning
+                "danger": "#DC3545", "danger_hover": "#c82333",    # Hover Danger
+                "dark": "#343A40", "light": "#F8F9FA", "text": "#FFFFFF"
+            },
+            "Moderno": {
+                "primary": "#000981", "primary_hover": "#000760",
+                "secondary": "#4527A0", "secondary_hover": "#3a2082",
+                "success": "#0D8040", "success_hover": "#0a6030", 
+                "warning": "#915E00", "warning_hover": "#7a4e00",
+                "danger": "#C62828", "danger_hover": "#a22020",    
+                "dark": "#343A40", "light": "#F8F9FA", "text": "#FFFFFF"
+            },
+            "Vibrante": {
+                "primary": "#FF007F", "primary_hover": "#cc0066",
+                "secondary": "#00D4FF", "secondary_hover": "#00aed4",
+                "success": "#39FF14", "success_hover": "#2eaf0e", 
+                "warning": "#FFE600", "warning_hover": "#d9c300",
+                "danger": "#FF0033", "danger_hover": "#c8002a",    
+                "dark": "#343A40", "light": "#F8F9FA", "text": "#FFFFFF"
+            },
+            "Suave": {
+                "primary": "#C0A9F7", "primary_hover": "#9a85c8",
+                "secondary": "#6C7BB1", "secondary_hover": "#576492",
+                "success": "#69F9A6", "success_hover": "#54c885", 
+                "warning": "#FAF48B", "warning_hover": "#d5d074",
+                "danger": "#FF6C6C", "danger_hover": "#cc5656",    
+                "dark": "#343A40", "light": "#F8F9FA", "text": "#FFFFFF"
+            },
+            "Escuro Total": {
+                "primary": "#3C4043", "primary_hover": "#2a2d30",
+                "secondary": "#191C1F", "secondary_hover": "#0a0a0a",
+                "success": "#2E7D32", "success_hover": "#225e27", 
+                "warning": "#EF6C00", "warning_hover": "#c95800",
+                "danger": "#C62828", "danger_hover": "#a22020",    
+                "dark": "#343A40", "light": "#F8F9FA", "text": "#FFFFFF"
+            }
         }
+        
         if value in palettes: self.colors.update(palettes[value])
+
         self._recursive_update_widgets(self)
+        
         self.config.data.setdefault('appearance', {})['color_scheme'] = value
         self.config.save()
         self.update()
@@ -1675,22 +2110,21 @@ class Esp32DeckApp(ctk.CTk):
     
     def _build_ui(self):
         self._build_header()
+        
         self.tabview = ctk.CTkTabview(self, width=860, height=500, corner_radius=10)
         self.tabview.pack(expand=True, fill='both', padx=20, pady=(0, 20))
+        
         self.tab_buttons = self.tabview.add('🎮 Configurar Botões')
         self.tab_connection = self.tabview.add('🔌 Conexão')
         self.tab_settings = self.tabview.add('⚙️ Configurações')
         self.tab_update = self.tabview.add('🔄 Atualização')
         
-        # Container principal dos botões
-        self.grid_buttons_parent = ctk.CTkFrame(self.tab_buttons, fg_color="transparent")
-        self.grid_buttons_parent.pack(expand=True, fill='both', padx=10, pady=10)
-        
-        self._build_buttons_tab(self.grid_buttons_parent) 
-
+        # A ordem de chamada das abas é importante para garantir que as referências existam
+        self._build_buttons_tab(self.tab_buttons) 
         self._build_connection_tab(self.tab_connection)
         self._build_settings_tab(self.tab_settings)
         self._build_update_tab(self.tab_update)
+        
         log_frame = ctk.CTkFrame(self, corner_radius=10)
         log_frame.pack(side='bottom', fill='x', padx=20, pady=(0, 10))
         log_header = ctk.CTkFrame(log_frame, fg_color="transparent")
@@ -1704,114 +2138,615 @@ class Esp32DeckApp(ctk.CTk):
         header = ctk.CTkFrame(self, height=60, corner_radius=0)
         header.pack(fill='x', padx=0, pady=0)
         header.pack_propagate(False)
+        
         title_frame = ctk.CTkFrame(header, fg_color="transparent")
         title_frame.pack(side='left', padx=20, pady=10)
         ctk.CTkLabel(title_frame, text=APP_NAME, font=ctk.CTkFont(size=20, weight="bold")).pack(anchor='w')
         ctk.CTkLabel(title_frame, text=f"v{APP_VERSION} - Controller para ESP32", font=ctk.CTkFont(size=12), text_color=self.colors["secondary"]).pack(anchor='w')
+        
         status_frame = ctk.CTkFrame(header, fg_color="transparent")
         status_frame.place(relx=0.5, rely=0.5, anchor='center')
         self.header_status_dot = ctk.CTkLabel(status_frame, text="●", font=ctk.CTkFont(size=20), text_color=self.colors["danger"])
         self.header_status_dot.pack(side='left', padx=(0, 5))
         self.header_status_text = ctk.CTkLabel(status_frame, text="Desconectado", font=ctk.CTkFont(size=14, weight="bold"), text_color=self.colors["danger"])
         self.header_status_text.pack(side='left')
+        
         btn_frame = ctk.CTkFrame(header, fg_color="transparent")
         btn_frame.pack(side='right', padx=20, pady=10)
+        
         ctk.CTkButton(btn_frame, text="ℹ️ Sobre", width=80, command=self._show_about).pack(side='right', padx=(5, 0))
         ctk.CTkButton(btn_frame, text="💾 Salvar", width=80, command=self._save_all, fg_color=self.colors["success"]).pack(side='right', padx=5)
+        
+        # O botão 'Atualizar' agora funciona corretamente
         ctk.CTkButton(btn_frame, text="🔄 Atualizar", width=80, command=self.refresh_all).pack(side='right', padx=5)
     
-    def _update_header_status(self, connected: bool):
-        self.after(0, lambda: self._set_header_visuals(connected))
+    def _update_header_status(self, connected: bool, connection_type: str = 'Serial'):
+        self.after(0, lambda: self._set_header_visuals(connected, connection_type))
         
-    def _set_header_visuals(self, connected: bool):
-            status_color = self.colors["success"] if connected else self.colors["danger"]
-            status_text = "Conectado" if connected else "Desconectado"
+    def _set_header_visuals(self, connected: bool, connection_type: str = 'Serial'):
+        
+        # Verifica se os widgets do cabeçalho e conexão foram construídos (evita o erro no __init__)
+        if not self.header_status_dot or not self.connect_btn:
+             return 
+
+        status_color = self.colors["success"] if connected else self.colors["danger"]
+        
+        # Usa 'USB' no lugar de 'Serial' apenas na interface visual
+        visual_connection_type = "USB" if connection_type == "Serial" else connection_type
+        status_text = f"Conectado ({visual_connection_type})" if connected else "Desconectado"
+        
+        self.header_status_dot.configure(text_color=status_color)
+        self.header_status_text.configure(text=status_text, text_color=status_color)
+
+        # Ajuste o estado do botão Connect/Disconnect
+        state_conn = 'disabled' if connected else 'normal'
+        state_disc = 'normal' if connected else 'disabled'
+        
+        self.connect_btn.configure(state=state_conn)
+        self.disconnect_btn.configure(state=state_disc)
+
+        # --- Lógica de ativação/desativação da aba de configurações de conexão ---
+        # Verifica se os widgets de configuração existem (Serial e Wi-Fi)
+        if self.port_option and self.ip_entry:
+            if connected:
+                # Desativa a edição da aba ativa
+                # Desativa todos os campos de configuração
+                self.port_option.configure(state='disabled')
+                self.baud_option.configure(state='disabled')
+                self.refresh_ports_btn.configure(state='disabled')
+                self.ip_entry.configure(state='disabled')
+                self.port_entry.configure(state='disabled')
+                self.search_btn.configure(state='disabled')
+            else:
+                # Se não estiver conectado, reativa apenas o modo selecionado
+                conn_type_ui = self.connection_type_var.get()
+                
+                # Desativa todos para garantir que apenas o correto seja ativado
+                self.port_option.configure(state='disabled')
+                self.baud_option.configure(state='disabled')
+                self.refresh_ports_btn.configure(state='disabled')
+                self.ip_entry.configure(state='disabled')
+                self.port_entry.configure(state='disabled')
+                self.search_btn.configure(state='disabled')
+
+                if conn_type_ui == 'USB': # Usa a string atualizada para o check
+                    self.port_option.configure(state='normal')
+                    self.baud_option.configure(state='normal')
+                    self.refresh_ports_btn.configure(state='normal')
+                elif conn_type_ui == 'Wi-Fi':
+                    self.ip_entry.configure(state='normal')
+                    self.port_entry.configure(state='normal')
+                    self.search_btn.configure(state='normal')
+
+
+        # --- Status Card Detalhes (NOVA LÓGICA) ---
+        
+        # Garante que os widgets do novo Status Card existam
+        if not self.dash_icon or not self.status_card or not self.connection_details_textbox:
+            return
             
-            self.header_status_dot.configure(text_color=status_color)
-            self.header_status_text.configure(text=status_text, text_color=status_color)
+        self.dash_icon.configure(text_color="white")
+        self.dash_status_text.configure(text_color=status_color)
+        self.status_card.configure(border_color=status_color)
+        
+        # Limpa e prepara o Textbox para receber detalhes
+        self.connection_details_textbox.configure(state="normal")
+        self.connection_details_textbox.delete('1.0', 'end')
 
-            state_conn = 'disabled' if connected else 'normal'
-            state_disc = 'normal' if connected else 'disabled'
+        if connected:
+            self.dash_icon.configure(text="⚡")
+            self.dash_status_text.configure(text="CONECTADO")
+            self.dash_sub_text.configure(text=f"Pronto para receber comandos via {visual_connection_type}.")
             
-            if hasattr(self, 'connect_btn'): # Garante que os widgets existem
-                self.connect_btn.configure(state=state_conn)
-                self.port_option.configure(state=state_conn)
-                self.baud_option.configure(state=state_conn)
-                self.refresh_ports_btn.configure(state=state_conn)
-                self.disconnect_btn.configure(state=state_disc)
+            detail_log = f"--- Detalhes da Conexão ---\n"
+            
+            if connection_type == 'Serial':
+                current_port = self.config.data.get('serial', {}).get('port', '-')
+                current_baud = self.config.data.get('serial', {}).get('baud', '-')
+                detail_log += f"Protocolo: USB/UART\n"
+                detail_log += f"Porta Ativa: {current_port}\n"
+                detail_log += f"Velocidade: {current_baud} bps"
+            
+            elif connection_type == 'Wi-Fi':
+                detail_log += f"Protocolo: TCP/IP\n"
+                detail_log += f"IP Ativo: {self.wifi_manager.host}\n"
+                detail_log += f"Porta: {self.wifi_manager.port}"
 
-                if connected:
-                    self.status_card.configure(border_color=self.colors["success"])
-                    self.dash_icon.configure(text="⚡")
-                    self.dash_status_text.configure(text="CONECTADO", text_color=self.colors["success"])
-                    self.dash_sub_text.configure(text="O sistema está pronto para receber comandos.")
-                    
-                    current_port = self.port_option.get()
-                    current_baud = self.baud_option.get()
-                    self.lbl_detail_port.configure(text=f"Porta Ativa: {current_port}")
-                    self.lbl_detail_baud.configure(text=f"Velocidade:  {current_baud} bps")
-                    self.details_frame.pack(fill='x', ipadx=20, ipady=10)
-                    
-                else:
-                    self.status_card.configure(border_color=self.colors["secondary"])
-                    self.dash_icon.configure(text="🔌") 
-                    self.dash_status_text.configure(text="DESCONECTADO", text_color=self.colors["danger"])
-                    self.dash_sub_text.configure(text="Selecione uma porta e clique em conectar.")
-                    self.details_frame.pack_forget()
+            self.connection_details_textbox.insert("end", detail_log)
+            
+        else:
+            self.dash_icon.configure(text="🔌") 
+            self.dash_status_text.configure(text="DESCONECTADO")
+            self.dash_sub_text.configure(text="Selecione um método de conexão e clique em conectar.")
+            self.connection_details_textbox.insert("end", "Aguardando conexão...\nDetalhes aparecerão aqui após conectar.")
+        
+        self.connection_details_textbox.configure(state="disabled")
 
-    def _build_buttons_tab(self, grid_frame):
-        """Constrói a aba de configuração de botões (Grid 4x2)."""
+    def _build_buttons_tab(self, parent):
+        """Constrói a aba de configuração de botões (Painel Lateral LED + Grid 4x4)."""
+
+        parent.grid_columnconfigure(0, weight=0, minsize=20) # Coluna Esquerda: Largura fixa (LED Control)
+        parent.grid_columnconfigure(1, weight=3) # Coluna Central: Expansível (Grid de Botões)
+        parent.grid_rowconfigure(0, weight=1)
+
+        # --- Painel Esquerdo: Controle de LED e Funções ---
+        left_panel = ctk.CTkFrame(parent, corner_radius=10)
+        left_panel.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=10)
+        self._build_led_control_panel(left_panel) 
+
+        # --- Painel Central: Grid de Botões ---
+        grid_container = ctk.CTkFrame(parent, fg_color="transparent")
+        grid_container.grid(row=0, column=1, sticky="nsew", padx=5, pady=10)
         
-        # Configura o grid para 4 colunas e 2 linhas (8 botões)
-        for i in range(4): grid_frame.grid_columnconfigure(i, weight=1)
-        for i in range(2): grid_frame.grid_rowconfigure(i, weight=1)
+        # O centering_frame é importante para manter o grid centralizado mesmo em telas grandes
+        self.centering_frame = ctk.CTkFrame(grid_container, fg_color="transparent")
+        self.centering_frame.place(relx=0.5, rely=0.5, anchor='center')
         
+        cols = 4
+        rows = BUTTON_COUNT // cols
+
+        for c in range(cols):
+            self.centering_frame.grid_columnconfigure(c, weight=1)
+
+        for r in range(rows):
+            self.centering_frame.grid_rowconfigure(r, weight=1)
+
         btn_id = 1
-        for row in range(2):
+        for row in range(4):
             for col in range(4):
                 key = str(btn_id)
-                self._create_button_frame(grid_frame, key, row, col)
+                self._create_button_frame(self.centering_frame, key, row, col)
                 btn_id += 1
-                
+
     def _create_button_frame(self, parent, key, row, col):
-        """Cria o frame de visualização de um único botão, destruindo o antigo se existir."""
+        """Cria o frame de visualização de um único botão, tornando-o clicável e adicionando hover."""
         
         # Se o botão já existe, destrói o frame antigo
         if key in self.button_frames and 'frame' in self.button_frames[key]:
             self.button_frames[key]['frame'].destroy()
             
-        # 1. Cria o novo Frame do Botão
-        btn_frame = ctk.CTkFrame(parent, width=180, height=180, corner_radius=12, border_width=2, border_color=self.colors["secondary"])
-        btn_frame.grid(row=row, column=col, padx=8, pady=8, sticky='nsew')
+        # 1. Cria o novo Frame do Botão - DIMENSÃO QUADRADA (100x100)
+        btn_frame = ctk.CTkFrame(parent, width=100, height=100, corner_radius=10, border_width=2, border_color=self.colors["secondary"]) 
         btn_frame.grid_propagate(False)
+        btn_frame.grid(row=row, column=col, padx=3, pady=3, sticky="nsew")
         
+        # --- DEFINE COR DE FUNDO PADRÃO ---
+        default_fg_color = parent.cget("fg_color")
+        btn_frame.configure(fg_color=default_fg_color) 
+
         # 2. Widgets internos
-        icon_label = ctk.CTkLabel(btn_frame, text='📱', width=64, height=64, font=ctk.CTkFont(size=24), text_color=self.colors["primary"])
-        icon_label.pack(pady=(15, 5))
+        # ... (código que cria icon_label e title_label)
+        icon_label = ctk.CTkLabel(btn_frame, text='📱', width=80, height=80, font=ctk.CTkFont(size=20), text_color=self.colors["primary"]) 
+        icon_label.pack(pady=(10, 10), expand=True) 
+        btn_frame.pack_propagate(False)
+
+        title_label = ctk.CTkLabel(btn_frame, text="", font=ctk.CTkFont(size=1, weight="bold")) 
+        title_label.pack_forget() 
+        # ... (fim dos widgets internos)
         
-        btn_conf = self.config.data.get('buttons', {}).get(key, {})
-        title_label = ctk.CTkLabel(btn_frame, text=btn_conf.get('label', f'Botão {key}'), font=ctk.CTkFont(size=14, weight="bold"))
-        title_label.pack(pady=(0, 5))
+        # 3. Adiciona o efeito Hover
         
-        ctk.CTkButton(btn_frame, text='Configurar', width=120, height=28, command=lambda i=key: self.open_button_config(i), fg_color=self.colors["primary"]).pack(pady=(0, 15))
+        def set_hover_on(widget):
+            widget.configure(border_color=self.colors["primary"]) 
+            widget.configure(fg_color=self.colors["secondary"])
+
+        def set_hover_off(widget):
+            widget.configure(border_color=self.colors["secondary"])
+            widget.configure(fg_color=default_fg_color)
         
-        # 3. Armazena a referência dos novos widgets
+        # --- LIGAÇÃO DIRETA DOS EVENTOS DE HOVER ---
+        
+        # HOVER NO FRAME PAI
+        btn_frame.bind('<Enter>', lambda e: set_hover_on(btn_frame))
+        btn_frame.bind('<Leave>', lambda e: set_hover_off(btn_frame))
+        icon_label.bind('<Enter>', lambda e: set_hover_on(btn_frame))
+        icon_label.bind('<Leave>', lambda e: set_hover_off(btn_frame))
+
+
+        # 4. Torna o FRAME inteiro clicável (O _make_clickable agora SÓ LIGA O CURSOR E O CLIQUE)
+        self._make_clickable(btn_frame, lambda i=key: self.open_button_config(i))
+
+        # 5. Armazena a referência
         self.button_frames[key] = {'frame': btn_frame, 'icon_label': icon_label, 'title_label': title_label, 'grid_row': row, 'grid_col': col}
 
+    def _build_led_control_panel(self, parent):
+        """Constrói o painel lateral de controle de LED."""
+        # Título Principal
+        ctk.CTkLabel(
+            parent, 
+            text="💡 Controle de LED", 
+            font=ctk.CTkFont(size=16, weight="bold")
+        ).pack(pady=(10, 10), padx=5)
+
+        parent.columnconfigure(0, weight=1) 
+        
+        # --- 1. Controle de Cor Individual (Ajuste Rápido) ---
+        individual_frame = ctk.CTkFrame(
+            parent, 
+            corner_radius=8, 
+            border_width=1, 
+            border_color=self.colors["secondary"]
+        )
+        individual_frame.pack(fill='x', padx=10, pady=(5, 10)) 
+        
+        # Configurando colunas para alinhar ComboBox, Preview e Botão
+        individual_frame.columnconfigure((0, 2), weight=0)
+        individual_frame.columnconfigure(1, weight=1)      
+        
+        # Título do Subpainel
+        ctk.CTkLabel(
+            individual_frame, 
+            text="Ajuste Rápido de Cor",
+            font=ctk.CTkFont(weight="bold", size=13)
+        ).grid(row=0, column=0, columnspan=3, sticky='w', padx=10, pady=(8, 5))
+        
+        # Linha de Seleção e Paleta
+        
+        # 1. Seleção do Botão (ComboBox)
+        button_keys = [str(i) for i in range(1, BUTTON_COUNT + 1)] 
+        self.led_button_select = ctk.CTkComboBox(
+            individual_frame, 
+            values=button_keys,
+            command=self._update_quick_led_preview,
+            width=60,
+            state='readonly'
+        )
+        self.led_button_select.set(button_keys[0])
+        self.led_button_select.grid(row=1, column=0, padx=(10, 5), pady=5, sticky='w')
+        
+        # 2. Pré-visualização da Cor
+        self.quick_led_color_var = tk.StringVar(value="#FFFFFF")
+        self.quick_color_preview = ctk.CTkLabel(
+            individual_frame, 
+            text=" ", 
+            width=25, 
+            height=25, 
+            corner_radius=5, 
+            fg_color="#FFFFFF",
+            bg_color=individual_frame.cget("fg_color") 
+        )
+        self.quick_color_preview.grid(row=1, column=1, padx=5, pady=5, sticky='w')
+        
+        # 3. Botão Paleta
+        ctk.CTkButton(
+            individual_frame, 
+            text="🎨", 
+            command=self._open_quick_color_picker, 
+            width=30, 
+            fg_color=self.colors["primary"]
+        ).grid(row=1, column=2, padx=(5, 10), pady=5, sticky='e')
+
+        # 4. Botão Aplicar (Ocupa toda a linha)
+        ctk.CTkButton(
+            individual_frame, 
+            text="⚡ Aplicar Cor", 
+            command=self._send_quick_led_color_command,
+            fg_color=self.colors["primary"] 
+        ).grid(row=2, column=0, columnspan=3, sticky='ew', padx=10, pady=(5, 10))
+        
+        # ----------------------------------------------
+        # --- 2. Controles Globais (Empilhados) ---
+        # ----------------------------------------------
+        global_frame = ctk.CTkFrame(
+            parent, 
+            corner_radius=8, 
+            border_width=1, 
+            border_color=self.colors["secondary"]
+        )
+        global_frame.pack(fill='x', padx=10, pady=(5, 15))
+        
+        # Configura o grid para ter apenas UMA coluna que se expande
+        global_frame.columnconfigure(0, weight=1) 
+        
+        # Título do Subpainel
+        ctk.CTkLabel(
+            global_frame, 
+            text="Comandos Globais", 
+            font=ctk.CTkFont(weight="bold", size=13)
+        ).grid(row=0, column=0, sticky='w', padx=10, pady=(8, 5), columnspan=1)
+        
+        row_idx = 1
+        
+        # Botão Ligar (Verde / Success)
+        ctk.CTkButton(
+            global_frame, 
+            text="Ligar Todos",
+            command=lambda: self._send_all_led_command("ON"),
+            fg_color=self.colors["success"],
+            hover_color="#1e7e34"
+        ).grid(row=row_idx, column=0, sticky='ew', padx=10, pady=(5, 5)) # padx total de 10
+        row_idx += 1
+        
+        # Botão Desligar (Vermelho / Danger)
+        ctk.CTkButton(
+            global_frame, 
+            text="Desligar Todos",
+            command=lambda: self._send_all_led_command("OFF"),
+            fg_color=self.colors["danger"],
+            hover_color="#c82333"
+        ).grid(row=row_idx, column=0, sticky='ew', padx=10, pady=5)
+        row_idx += 1
+
+        # Botão Efeito Arco-Íris
+        ctk.CTkButton(
+            global_frame, 
+            text="Efeito Arco-Íris 🌈", 
+            command=lambda: self._send_all_led_command("RAINBOW"),
+            fg_color=self.colors["primary"] 
+        ).grid(row=row_idx, column=0, sticky='ew', padx=10, pady=5)
+        row_idx += 1
+        
+        # Botão Efeito Piscante
+        ctk.CTkButton(
+            global_frame, 
+            text="Efeito Piscante ✨", 
+            command=lambda: self._send_all_led_command("BLINK"),
+            fg_color=self.colors["primary"] 
+        ).grid(row=row_idx, column=0, sticky='ew', padx=10, pady=(5, 10)) # pady final maior
+        row_idx += 1
+
+        self._update_quick_led_preview()
+
+    def _update_quick_led_preview(self, *args):
+        """Atualiza a pré-visualização de cor rápida baseada na cor salva do botão selecionado."""
+        selected_key = self.led_button_select.get()
+        btn_conf = self.config.data.get('buttons', {}).get(selected_key, {})
+        color = btn_conf.get('led_color', '#FFFFFF')
+        
+        self.quick_led_color_var.set(color)
+        self.quick_color_preview.configure(fg_color=color)
+
+    def _open_quick_color_picker(self):
+        """Abre o seletor de cores nativo e atualiza a cor rápida e o conf.data."""
+        color_code = colorchooser.askcolor(title="Escolha a Cor do LED")
+        
+        if color_code and color_code[1]:
+            hex_color = color_code[1].upper()
+            
+            # 1. Atualiza a UI e a variável
+            self.quick_led_color_var.set(hex_color)
+            self.quick_color_preview.configure(fg_color=hex_color)
+            
+            selected_key = self.led_button_select.get()
+            
+            # 2. Salva a cor na configuração do botão selecionado
+            if selected_key in self.config.data['buttons']:
+                self.config.data['buttons'][selected_key]['led_color'] = hex_color
+                self.config.save()
+                self.logger.info(f"Cor do LED do Botão {selected_key} atualizada para {hex_color} (localmente).")
+            
+            # 3. Envia imediatamente via serial/wifi
+            self._send_quick_led_color_command()
+
+    def _send_quick_led_color_command(self):
+        """Envia o comando de cor do LED via conexão ativa (usando a cor rápida selecionada)."""
+        selected_key = self.led_button_select.get()
+        color = self.quick_led_color_var.get() 
+        self._send_led_color_command(selected_key, color)
+
+    def _send_led_color_command(self, button_key: str, color_hex: str):
+        """Envia o comando de cor do LED via conexão ativa (Serial ou Wi-Fi)."""
+        
+        is_serial = self.serial_manager.is_connected
+        is_wifi = self.wifi_manager.is_connected
+        
+        if not is_serial and not is_wifi:
+            self.logger.warn("❌ Não conectado: Conecte à porta serial ou Wi-Fi para enviar comandos de LED.")
+            messagebox.showwarning("Aviso", "Não é possível enviar comandos de LED. Conecte primeiro.")
+            return
+
+        # Formato de Comando Sugerido para WS2812B: LED:<ID>:<RRGGBB>
+        try:
+            led_index = int(button_key) - 1 
+            hex_payload = color_hex.lstrip('#') 
+            
+            command = f"LED:{led_index}:{hex_payload}" # Sem o '\n' para ser adicionado pelo send_command
+            
+            if is_serial:
+                self.serial_manager.send_command(command)
+                self.logger.info(f"⚡ Enviado serial: {command}")
+            elif is_wifi:
+                self.wifi_manager.send_command(command)
+                self.logger.info(f"⚡ Enviado Wi-Fi: {command}")
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao formatar/enviar comando LED: {e}")
+
+    def _send_all_led_command(self, command: str):
+        """Envia um comando para todos os LEDs (Ex: ON, OFF, RAINBOW)"""
+        is_serial = self.serial_manager.is_connected
+        is_wifi = self.wifi_manager.is_connected
+        
+        if not is_serial and not is_wifi:
+            self.logger.warn("❌ Não conectado: Conecte à porta serial ou Wi-Fi para enviar comandos de LED.")
+            messagebox.showwarning("Aviso", "Não é possível enviar comandos de LED. Conecte primeiro.")
+            return
+
+        # Formato de Comando Sugerido: ALL_LED:<COMMAND>
+        try:
+            cmd = f"ALL_LED:{command}"
+            
+            if is_serial:
+                self.serial_manager.send_command(cmd)
+                self.logger.info(f"⚡ Enviado serial (Comando Global LED): {cmd}")
+            elif is_wifi:
+                self.wifi_manager.send_command(cmd)
+                self.logger.info(f"⚡ Enviado Wi-Fi (Comando Global LED): {cmd}")
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao enviar comando global LED: {e}")
+
+
+    def _backup_config(self): 
+        try:
+            path = self.config.backup()
+            messagebox.showinfo("Backup", f"Configuração salva em:\n{path}")
+        except RuntimeError:
+            pass # Cancelado
+        except Exception as e:
+            messagebox.showerror("Erro", f"Falha ao salvar backup: {e}")
+
+    def _restore_config(self):
+        if not messagebox.askyesno("Restaurar", "Isto substituirá a configuração atual. Continuar?"):
+            return
+        try:
+            path = self.config.restore()
+            self.refresh_all()
+            messagebox.showinfo("Restauração", f"Configuração carregada de:\n{path}")
+        except RuntimeError:
+            pass # Cancelado
+        except Exception as e:
+            messagebox.showerror("Erro", f"Falha ao restaurar: {e}")
+
+    def _build_connection_status_card(self, parent):
+        """
+        Cria o novo Status Card compacto e informativo.
+        Substitui o Status Card anterior (self.status_card, self.dash_icon, etc.).
+        """
+        
+        # Este card é menor e usa um fundo 'dark' para contraste, 
+        # independentemente do tema Light/Dark.
+        self.status_card = ctk.CTkFrame(
+            parent, 
+            corner_radius=10, 
+            fg_color=self.colors["dark"], # Fundo escuro para contraste
+            border_width=2, 
+            border_color=self.colors["danger"] # Cor de borda inicial (Desconectado)
+        )
+        self.status_card.pack(fill='x', padx=10, pady=(20, 10))
+        
+        # Configurações do Grid interno (Ícone + Título + Subtítulo)
+        self.status_card.columnconfigure(0, weight=0) # Ícone
+        self.status_card.columnconfigure(1, weight=1) # Texto
+        
+        # Ícone de Status (Coluna 0)
+        self.dash_icon = ctk.CTkLabel(
+            self.status_card, 
+            text="🔌", 
+            font=ctk.CTkFont(size=30), 
+            text_color="white"
+        )
+        self.dash_icon.grid(row=0, column=0, rowspan=2, padx=15, pady=10, sticky='nsew')
+
+        # Status Principal (Coluna 1, Linha 0)
+        self.dash_status_text = ctk.CTkLabel(
+            self.status_card, 
+            text="DESCONECTADO", 
+            font=ctk.CTkFont(size=16, weight="bold"), 
+            text_color=self.colors["danger"],
+            anchor='w'
+        )
+        self.dash_status_text.grid(row=0, column=1, padx=(0, 15), pady=(10, 0), sticky='w')
+
+        # Detalhe / Subtítulo (Coluna 1, Linha 1)
+        self.dash_sub_text = ctk.CTkLabel(
+            self.status_card, 
+            text="Selecione um método de conexão e clique em conectar.", 
+            font=ctk.CTkFont(size=12), 
+            text_color="gray",
+            anchor='w'
+        )
+        self.dash_sub_text.grid(row=1, column=1, padx=(0, 15), pady=(0, 10), sticky='w')
+        
+        # O self.details_frame não é mais usado, mas a variável precisa ser setada para evitar erros.
+        self.details_frame = self.status_card
+        
+        # Remove a construção dos antigos detalhes:
+        self.lbl_detail_port = None
+        self.lbl_detail_baud = None
+        self.lbl_detail_proto = None
+
     def _build_connection_tab(self, parent):
-        parent.grid_columnconfigure(0, weight=1) 
-        parent.grid_columnconfigure(1, weight=2) 
+        
+        # O estado inicial do Connection Type é lido do config.data
+        initial_conn_type = self.connection_type_var.get()
+
+        # Configurações do Grid: 2 Colunas de peso igual
+        parent.grid_columnconfigure((0, 1), weight=1) 
         parent.grid_rowconfigure(0, weight=1)
         
+        # --- COLUNA 0: Configurações de Conexão (Serial/Wi-Fi) ---
         config_frame = ctk.CTkFrame(parent, corner_radius=10)
         config_frame.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=10)
         
         ctk.CTkLabel(config_frame, text="⚙️ Configuração", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(20, 15))
         
-        port_frame = ctk.CTkFrame(config_frame, fg_color="transparent")
-        port_frame.pack(fill='x', padx=15, pady=5)
+        # 1. Segmented Button para escolher o tipo de conexão
+        self.connection_type_switcher = ctk.CTkSegmentedButton(
+            config_frame, 
+            # AQUI: A string 'Serial' é trocada por 'USB' para fins de interface
+            values=['USB', 'Wi-Fi'], 
+            command=self._on_connection_type_change,
+            variable=self.connection_type_var
+        )
+        self.connection_type_switcher.pack(fill='x', padx=15, pady=(0, 20))
         
-        ctk.CTkLabel(port_frame, text="Porta Serial (COM):", font=ctk.CTkFont(weight="bold"), anchor="w").pack(fill='x')
+        # Se a config antiga for 'Serial', atualiza a variável para 'USB' no início para a UI
+        if initial_conn_type == 'Serial':
+            self.connection_type_var.set('USB')
+        
+        # 2. Frame Container para as configurações específicas
+        self.connection_settings_frame = ctk.CTkFrame(config_frame, fg_color="transparent")
+        self.connection_settings_frame.pack(fill='both', expand=True, padx=15, pady=(0, 10))
+        
+        # 3. Frames de Serial e Wi-Fi (construídos)
+        self._build_serial_settings_frame()
+        self._build_wifi_settings_frame()
+        
+        # 4. Ação Frame
+        action_frame = ctk.CTkFrame(config_frame, fg_color="transparent")
+        action_frame.pack(fill='x', padx=15, pady=(0, 20))
+
+        self.connect_btn = ctk.CTkButton(
+            action_frame, 
+            text="🔗 Conectar", 
+            command=self._connect_any, 
+            fg_color=self.colors["success"]
+        )
+        self.connect_btn.pack(fill='x', pady=(0, 10))
+
+        self.disconnect_btn = ctk.CTkButton(
+            action_frame, 
+            text="🔓 Desconectar", 
+            command=self._disconnect_any, 
+            state='disabled', 
+            fg_color=self.colors["danger"]
+        )
+        self.disconnect_btn.pack(fill='x')
+        
+        # 5. Inicializa o estado correto (agora é seguro chamar)
+        # Passa o tipo ORIGINAL para garantir que a lógica use "Serial"
+        self._on_connection_type_change(self.connection_type_var.get())
+        
+        # --- COLUNA 1: Status e Detalhes ---
+        status_and_details_frame = ctk.CTkFrame(parent, corner_radius=10)
+        status_and_details_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 10), pady=10)
+        
+        # 1. Novo Status Card (Mais compacto)
+        self._build_connection_status_card(status_and_details_frame) 
+        
+        # 2. Log de Eventos da Conexão (Novo)
+        log_card = ctk.CTkFrame(status_and_details_frame, corner_radius=10)
+        log_card.pack(fill='both', expand=True, padx=10, pady=(10, 20))
+        
+        ctk.CTkLabel(log_card, text="Detalhes da Conexão", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor='w', padx=15, pady=(10, 5))
+        
+        # Substitui o 'details_frame' antigo por um Textbox mais moderno
+        self.connection_details_textbox = ctk.CTkTextbox(log_card, height=100, state='disabled')
+        self.connection_details_textbox.pack(fill='both', expand=True, padx=15, pady=(0, 15))
+
+        # 6. Força a atualização visual inicial
+        # É importante passar o tipo de conexão real (Serial ou Wi-Fi) para a lógica do status
+        self._set_header_visuals(self.serial_manager.is_connected or self.wifi_manager.is_connected, 'Serial' if self.connection_type_var.get() == 'USB' else self.connection_type_var.get())
+
+
+    def _build_serial_settings_frame(self):
+        self.serial_frame = ctk.CTkFrame(self.connection_settings_frame, fg_color="transparent")
+        
+        port_frame = ctk.CTkFrame(self.serial_frame, fg_color="transparent")
+        port_frame.pack(fill='x', pady=5)
+        
+        ctk.CTkLabel(port_frame, text="Porta USB (COM):", font=ctk.CTkFont(weight="bold"), anchor="w").pack(fill='x')
         
         self.port_option = ctk.CTkOptionMenu(port_frame, values=['Nenhuma'], width=200)
         self.port_option.pack(fill='x', pady=(5, 5))
@@ -1825,10 +2760,10 @@ class Esp32DeckApp(ctk.CTk):
         )
         self.refresh_ports_btn.pack(fill='x')
 
-        ctk.CTkFrame(config_frame, height=2, fg_color=self.colors["secondary"]).pack(fill='x', padx=20, pady=20)
+        ctk.CTkFrame(self.serial_frame, height=2, fg_color=self.colors["secondary"]).pack(fill='x', padx=5, pady=20)
 
-        baud_frame = ctk.CTkFrame(config_frame, fg_color="transparent")
-        baud_frame.pack(fill='x', padx=15, pady=5)
+        baud_frame = ctk.CTkFrame(self.serial_frame, fg_color="transparent")
+        baud_frame.pack(fill='x', pady=5)
         
         ctk.CTkLabel(baud_frame, text="Velocidade (Baud):", font=ctk.CTkFont(weight="bold"), anchor="w").pack(fill='x')
         
@@ -1837,55 +2772,179 @@ class Esp32DeckApp(ctk.CTk):
         self.baud_option.set(str(self.config.data.get('serial', {}).get('baud', DEFAULT_SERIAL_BAUD)))
         self.baud_option.pack(fill='x', pady=5)
 
-        ctk.CTkLabel(config_frame, text="").pack(expand=True)
+    def _build_wifi_settings_frame(self):
+        initial_ip = self.config.data.get('wifi', {}).get('ip', '192.168.1.100')
+        initial_port = self.config.data.get('wifi', {}).get('port', 8000)
 
-        action_frame = ctk.CTkFrame(config_frame, fg_color="transparent")
-        action_frame.pack(fill='x', padx=15, pady=20)
-
-        self.connect_btn = ctk.CTkButton(
-            action_frame, 
-            text="🔗 Conectar", 
-            command=self._connect_serial, 
-            fg_color=self.colors["success"]
+        self.wifi_frame = ctk.CTkFrame(self.connection_settings_frame, fg_color="transparent")
+        
+        ip_frame = ctk.CTkFrame(self.wifi_frame, fg_color="transparent")
+        ip_frame.pack(fill='x', pady=5)
+        
+        ctk.CTkLabel(ip_frame, text="Endereço IP do ESP32:", font=ctk.CTkFont(weight="bold"), anchor="w").pack(fill='x')
+        
+        ip_input_frame = ctk.CTkFrame(ip_frame, fg_color="transparent")
+        ip_input_frame.pack(fill='x')
+        
+        self.ip_entry = ctk.CTkEntry(ip_input_frame, placeholder_text="Ex: 192.168.1.100")
+        self.ip_entry.insert(0, initial_ip)
+        self.ip_entry.pack(side='left', fill='x', expand=True, pady=5, padx=(0, 5))
+        
+        self.search_btn = ctk.CTkButton(
+            ip_input_frame, 
+            text="🔍 Buscar", 
+            command=self._search_wifi_device,
+            fg_color=self.colors["primary"],
+            width=80
         )
-        self.connect_btn.pack(fill='x', pady=(0, 10))
+        self.search_btn.pack(side='right', pady=5)
 
-        self.disconnect_btn = ctk.CTkButton(
-            action_frame, 
-            text="🔓 Desconectar", 
-            command=self._disconnect_serial, 
-            state='disabled', 
-            fg_color=self.colors["danger"]
-        )
-        self.disconnect_btn.pack(fill='x')
-
-        self.status_card = ctk.CTkFrame(parent, corner_radius=10, border_width=2, border_color=self.colors["secondary"])
-        self.status_card.grid(row=0, column=1, sticky="nsew", padx=(5, 10), pady=10)
+        ctk.CTkFrame(self.wifi_frame, height=2, fg_color=self.colors["secondary"]).pack(fill='x', padx=5, pady=20)
         
-        status_content = ctk.CTkFrame(self.status_card, fg_color="transparent")
-        status_content.place(relx=0.5, rely=0.5, anchor='center')
-
-        self.dash_icon = ctk.CTkLabel(status_content, text="🔌", font=ctk.CTkFont(size=80))
-        self.dash_icon.pack(pady=(0, 10))
-
-        self.dash_status_text = ctk.CTkLabel(status_content, text="DESCONECTADO", font=ctk.CTkFont(size=24, weight="bold"), text_color=self.colors["danger"])
-        self.dash_status_text.pack(pady=5)
-
-        self.dash_sub_text = ctk.CTkLabel(status_content, text="O dispositivo não está comunicando.", font=ctk.CTkFont(size=14), text_color="gray")
-        self.dash_sub_text.pack(pady=(0, 30))
-
-        self.details_frame = ctk.CTkFrame(status_content, fg_color=self.colors["dark"], corner_radius=8)
-        self.details_frame.pack(fill='x', ipadx=20, ipady=10)
-        self.details_frame.pack_forget() 
-
-        self.lbl_detail_port = ctk.CTkLabel(self.details_frame, text="Porta: -", font=ctk.CTkFont(family="Consolas", size=12))
-        self.lbl_detail_port.pack(anchor='w')
+        port_frame = ctk.CTkFrame(self.wifi_frame, fg_color="transparent")
+        port_frame.pack(fill='x', pady=5)
         
-        self.lbl_detail_baud = ctk.CTkLabel(self.details_frame, text="Baud: -", font=ctk.CTkFont(family="Consolas", size=12))
-        self.lbl_detail_baud.pack(anchor='w')
+        ctk.CTkLabel(port_frame, text="Porta TCP:", font=ctk.CTkFont(weight="bold"), anchor="w").pack(fill='x')
         
-        self.lbl_detail_proto = ctk.CTkLabel(self.details_frame, text="Protocolo: Serial/UART", font=ctk.CTkFont(family="Consolas", size=12))
-        self.lbl_detail_proto.pack(anchor='w')
+        self.port_entry = ctk.CTkEntry(port_frame, placeholder_text="Ex: 8000")
+        self.port_entry.insert(0, str(initial_port))
+        self.port_entry.pack(fill='x', pady=5)
+
+    def _on_connection_type_change(self, value):
+        # Remove todos os widgets do container antes de adicionar o novo
+        for widget in self.connection_settings_frame.winfo_children():
+            widget.pack_forget()
+            
+        # O valor aqui pode ser 'USB' (nova UI) ou 'Serial' (config antiga)
+        # Normalizamos para 'Serial' para salvar e usar a lógica interna
+        if value == 'USB' or value == 'Serial':
+            self.serial_frame.pack(fill='both', expand=True)
+            saved_value = 'Serial'
+            
+            # Se for 'USB', atualiza a variável para 'USB' para manter a seleção visual
+            if value == 'USB':
+                 self.connection_type_var.set('USB') 
+            
+        elif value == 'Wi-Fi':
+            self.wifi_frame.pack(fill='both', expand=True)
+            saved_value = 'Wi-Fi'
+
+        # Salva o tipo de conexão preferido (usando 'Serial' ou 'Wi-Fi' internamente)
+        self.config.data.setdefault('serial', {})['type'] = saved_value
+        self.config.save()
+        
+        # Se um estiver conectado, o outro deve ser desconectado.
+        is_serial_selected = saved_value == 'Serial'
+        
+        if is_serial_selected and self.wifi_manager.is_connected:
+            self._disconnect_any()
+        elif not is_serial_selected and self.serial_manager.is_connected:
+            self._disconnect_any()
+            
+        # Atualiza o estado dos botões de conectar/desconectar na UI
+        self._set_header_visuals(self.serial_manager.is_connected or self.wifi_manager.is_connected, saved_value)
+
+    def _connect_any(self):
+        # Mapeia a string da UI de volta para a lógica interna
+        conn_type_ui = self.connection_type_var.get()
+        conn_type_logic = 'Serial' if conn_type_ui == 'USB' else conn_type_ui
+        
+        # Desconecta o manager não selecionado primeiro
+        if conn_type_logic == 'Serial' and self.wifi_manager.is_connected:
+            self.wifi_manager.disconnect()
+        elif conn_type_logic == 'Wi-Fi' and self.serial_manager.is_connected:
+            self.serial_manager.disconnect()
+
+        # Tenta conectar
+        if conn_type_logic == 'Serial':
+            self._connect_serial()
+        elif conn_type_logic == 'Wi-Fi':
+            self._connect_wifi()
+            
+    def _disconnect_any(self):
+        self.serial_manager.disconnect()
+        self.wifi_manager.disconnect()
+        
+    def _connect_serial(self):
+        port = self.port_option.get()
+        if not port or port == 'Nenhuma': 
+            self.logger.warn("Selecione uma porta válida para conectar.")
+            return
+            
+        baud = int(self.baud_option.get())
+        if self.serial_manager.connect(port, baud):
+            self.config.data['serial']['port'] = port
+            self.config.data['serial']['baud'] = baud
+            self.config.save()
+
+    def _connect_wifi(self):
+        host = self.ip_entry.get().strip()
+        try:
+            port = int(self.port_entry.get().strip())
+        except ValueError:
+            self.logger.error("Porta inválida.")
+            messagebox.showerror("Erro", "A porta deve ser um número válido (Ex: 8000).")
+            return
+
+        if not host or port <= 0:
+            self.logger.warn("Preencha o IP e a Porta.")
+            return
+
+        # Tenta conectar o Wi-Fi
+        if self.wifi_manager.connect(host, port):
+            # Salva a configuração Wi-Fi
+            self.config.data.setdefault('wifi', {})['ip'] = host
+            self.config.data.setdefault('wifi', {})['port'] = port
+            self.config.save()
+        
+    def _search_wifi_device(self):
+        self.search_btn.configure(state='disabled', text="Buscando...")
+        self.ip_entry.configure(state='disabled')
+        
+        t = threading.Thread(target=self._run_search_device, daemon=True)
+        t.start()
+        
+    def _run_search_device(self):
+        found_ip = self.wifi_manager.search_device()
+        self.after(0, lambda: self._process_search_result(found_ip))
+
+    def _process_search_result(self, ip: Optional[str]):
+        self.search_btn.configure(state='normal', text="🔍 Buscar")
+        self.ip_entry.configure(state='normal')
+        
+        if ip:
+            self.ip_entry.delete(0, 'end')
+            self.ip_entry.insert(0, ip)
+            self.logger.info(f"Dispositivo Wi-Fi encontrado em: {ip}")
+            messagebox.showinfo("Sucesso", f"Dispositivo encontrado em: {ip}")
+        else:
+            self.logger.warn("Dispositivo Wi-Fi não encontrado.")
+            messagebox.showwarning("Aviso", "Dispositivo não encontrado. Verifique o Wi-Fi do ESP32 e o código de broadcast.")
+
+    def update_serial_ports(self):
+        ports = self.serial_manager.list_ports() or ['Nenhuma']
+        self.port_option.configure(values=ports)
+        try:
+            curr = self.config.data.get('serial', {}).get('port', '')
+            self.port_option.set(curr if curr in ports else ports[0])
+        except: self.port_option.set(ports[0])
+
+    def _clear_log(self):
+        self.log_textbox.configure(state='normal')
+        self.log_textbox.delete('1.0', 'end')
+        self.log_textbox.configure(state='disabled')
+        
+    def _on_baud_change(self, value):
+        self.config.data['serial']['baud'] = int(value)
+        self.config.save()
+        
+    def _save_all(self):
+        if self.config.save(): 
+            messagebox.showinfo("Sucesso", "Configurações salvas!")
+        else: 
+            messagebox.showerror("Erro", "Erro ao salvar!")
+            
+    def _show_about(self): AboutDialog(self)
 
     def _build_settings_tab(self, parent):
         parent.grid_columnconfigure(0, weight=1)
@@ -2035,7 +3094,7 @@ class Esp32DeckApp(ctk.CTk):
         arrow_label = ctk.CTkLabel(cards_frame, text="➜", font=ctk.CTkFont(size=24), text_color="gray")
         arrow_label.pack(side='left', padx=10)
         
-        self.remote_version_var = tk.StringVar(value=APP_VERSION)
+        # self.remote_version_var é inicializado no __init__
         self.remote_card_frame = self._create_version_card(cards_frame, "Versão no Servidor", self.remote_version_var, self.colors["dark"], "right")
 
         action_frame = ctk.CTkFrame(main_container, corner_radius=8, border_width=1, border_color=self.colors["secondary"])
@@ -2062,7 +3121,7 @@ class Esp32DeckApp(ctk.CTk):
 
         self.last_check_label = ctk.CTkLabel(main_container, text="Última verificação: Nunca", font=ctk.CTkFont(size=10), text_color="gray")
         self.last_check_label.pack(side='bottom', pady=5)
-    
+
     def _create_version_card(self, parent, title, value_var, color, side):
         card = ctk.CTkFrame(parent, corner_radius=10, border_width=2, border_color=color)
         card.pack(side=side, expand=True, fill='both', padx=5)
@@ -2090,15 +3149,17 @@ class Esp32DeckApp(ctk.CTk):
         e eliminar referências de ícones fantasmas.
         """
         
+        if not self.centering_frame:
+            # Se o frame principal ainda não existe, sai.
+            return
+
         btn_id = 1
-        for row in range(2):
+        for row in range(4):
             for col in range(4):
                 key = str(btn_id)
                 
-                # Passo 1: RECRIA O FRAME DO ZERO
-                self._create_button_frame(self.grid_buttons_parent, key, row, col)
-                
-                # Passo 2: Configura o novo frame com as informações atualizadas
+                self._create_button_frame(self.centering_frame, key, row, col)
+
                 btn_conf = self.config.data.get('buttons', {}).get(key, {})
                 icon_path = btn_conf.get('icon', '')
                 
@@ -2108,7 +3169,7 @@ class Esp32DeckApp(ctk.CTk):
                     ctk_img = self.icon_loader.load_icon_from_path(icon_path)
 
                 widget_map = self.button_frames[key]
-                widget_map['title_label'].configure(text=btn_conf.get('label', f'Botão {key}'))
+                widget_map['title_label'].configure(text=btn_conf.get('label', ''))
                 
                 if ctk_img:
                     widget_map['icon_label'].configure(image=ctk_img, text='')
@@ -2132,45 +3193,6 @@ class Esp32DeckApp(ctk.CTk):
         self.wait_window(dlg)
         
         self.config.save()
-
-    def update_serial_ports(self):
-        ports = self.serial_manager.list_ports() or ['Nenhuma']
-        self.port_option.configure(values=ports)
-        try:
-            curr = self.config.data.get('serial', {}).get('port', '')
-            self.port_option.set(curr if curr in ports else ports[0])
-        except: self.port_option.set(ports[0])
-
-    def _connect_serial(self):
-        port = self.port_option.get()
-        if not port or port == 'Nenhuma': 
-            self.logger.warn("Selecione uma porta válida para conectar.")
-            return
-            
-        baud = int(self.baud_option.get())
-        if self.serial_manager.connect(port, baud):
-            self.config.data['serial']['port'] = port
-            self.config.data['serial']['baud'] = baud
-            self.config.save()
-
-    def _disconnect_serial(self): self.serial_manager.disconnect()
-        
-    def _clear_log(self):
-        self.log_textbox.configure(state='normal')
-        self.log_textbox.delete('1.0', 'end')
-        self.log_textbox.configure(state='disabled')
-        
-    def _on_baud_change(self, value):
-        self.config.data['serial']['baud'] = int(value)
-        self.config.save()
-        
-    def _save_all(self):
-        if self.config.save(): 
-            messagebox.showinfo("Sucesso", "Configurações salvas!")
-        else: 
-            messagebox.showerror("Erro", "Erro ao salvar!")
-            
-    def _show_about(self): AboutDialog(self)
 
     def _check_update_thread(self):
         self.check_update_btn.configure(state='disabled', text="Conectando...")
@@ -2236,18 +3258,28 @@ class Esp32DeckApp(ctk.CTk):
                 self.check_update_btn.configure(fg_color=self.colors["success"], text="🔍 Verificar Novamente")
 
     def _on_serial_message(self, text: str):
-        self.logger.info(f'<- ESP: {text}')
-        
+        self.logger.info(f'<- ESP (Serial): {text}')
+        self._process_button_message(text)
+
+    def _on_wifi_message(self, text: str):
+        self.logger.info(f'<- ESP (Wi-Fi): {text}')
+        self._process_button_message(text)
+
+    def _process_button_message(self, text: str):
         if text.startswith('BTN:'):
-            key = text.split(':')[1]
-            btn_conf = self.config.data['buttons'].get(key)
-            if btn_conf: 
-                self.action_manager.perform(
-                    Action(
-                        btn_conf.get('action', {}).get('type', 'none'), 
-                        btn_conf.get('action', {}).get('payload', '')
+            # Formato: BTN:<ID>
+            try:
+                key = text.split(':')[1]
+                btn_conf = self.config.data['buttons'].get(key)
+                if btn_conf: 
+                    self.action_manager.perform(
+                        Action(
+                            btn_conf.get('action', {}).get('type', 'none'), 
+                            btn_conf.get('action', {}).get('payload', '')
+                        )
                     )
-                )
+            except IndexError:
+                self.logger.error(f"Mensagem BTN inválida: {text}")
 
 def main():
     ctk.set_appearance_mode('System')
