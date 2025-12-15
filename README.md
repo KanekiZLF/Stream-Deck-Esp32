@@ -324,7 +324,6 @@ drawPanelCompact();    // ⭐ Opção 1 - Mais compacta
 
 ### ❌ **Ações Não Executam**
 
-- **Verifique se PyAutoGUI está instalado** para hotkeys e digitação
 - **Confirme caminhos absolutos** para programas e scripts
 - **Teste ações individualmente** antes de criar macros
 
