@@ -2531,7 +2531,7 @@ class Esp32DeckApp(ctk.CTk):
         is_wifi = self.wifi_manager.is_connected
         
         if not is_serial and not is_wifi:
-            self.logger.warn("❌ Não conectado: Conecte à porta serial ou Wi-Fi para enviar comandos de LED.")
+            self.logger.warn("❌ Não conectado: Conecte ao USB ou Wi-Fi para enviar comandos de LED.")
             messagebox.showwarning("Aviso", "Não é possível enviar comandos de LED. Conecte primeiro.")
             return
 
