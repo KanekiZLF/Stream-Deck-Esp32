@@ -28,7 +28,8 @@ except ImportError:
 # GUI libs
 import customtkinter as ctk
 import tkinter as tk
-from tkinter import filedialog, messagebox, simpledialog, colorchooser 
+from tkinter import filedialog, simpledialog, colorchooser 
+# REMOVIDO: from tkinter import messagebox (substituído por CTkMessageDialog)
 from PIL import Image, ImageTk, ImageDraw
 
 # Serial
@@ -105,7 +106,8 @@ COLORS = {
     "danger": "#DC3545",
     "dark": "#343A40",
     "light": "#F8F9FA",
-    "text": "#FFFFFF"
+    "text": "#FFFFFF",
+    "default": "#0003AA",
 }
 
 # -----------------------------
@@ -161,7 +163,7 @@ class Logger:
         print(entry)
         
         should_save = False
-        if level == "ERROR":
+        if level in ("WARN", "ERROR"):
             should_save = True
         elif "Fechando aplicação" in msg or "USB Desconectado" in msg or "Wi-Fi Desconectado" in msg:
             should_save = True
@@ -660,6 +662,184 @@ class ActionManager:
                     
         except Exception as e:
             self.logger.error(f'Erro ao executar ação: {e}\n{traceback.format_exc()}')
+
+
+# -----------------------------
+# Dialogs (Custom Messagebox) - MELHORADA E ADAPTÁVEL
+# -----------------------------
+class CTkMessageDialog(ctk.CTkToplevel):
+    """Substitui o tkinter.messagebox com o estilo CustomTkinter, com tamanho adaptável."""
+    
+    def __init__(self, parent, title: str, message: str, type: str, logger: Logger, icon: Optional[str] = None):
+        super().__init__(parent)
+        
+        self.withdraw()
+        self.result = None
+        self.type = type
+        self.logger = logger
+        self.parent = parent
+        self.message = message
+        self.icon_text = icon
+
+        # 1. Configurações base
+        self.title(title)
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+        
+        # Mapeamento de Cores/Ícones
+        if self.type == "info":
+            self.color = COLORS["primary"]
+            self.icon_text = "ℹ️"
+        elif self.type == "warning":
+            self.color = COLORS["warning"]
+            self.icon_text = "⚠️"
+        elif self.type == "error":
+            self.color = COLORS["danger"]
+            self.icon_text = "❌"
+        elif self.type == "confirm":
+            self.color = COLORS["secondary"]
+            self.icon_text = "❓"
+        else:
+            self.color = COLORS["primary"]
+            self.icon_text = "💬"
+            
+        if icon: self.icon_text = icon
+
+        # 2. Constrói UI para obter as dimensões (Temporário/Final)
+        self._build_ui()
+
+        # 3. Calcula o tamanho e centraliza
+        self._calculate_and_resize()
+        
+        self.deiconify()
+        self.lift() 
+        
+    def _calculate_and_resize(self):
+        """Calcula o tamanho ideal da janela baseado nos widgets e aplica centralização."""
+        
+        # O cálculo precisa ser feito após a inserção do texto na label e no frame
+        self.update_idletasks()
+        
+        # Largura: Largura do frame de conteúdo + margens laterais (20+20)
+        content_width = self.content_frame.winfo_reqwidth()
+        window_width = max(400, content_width + 40) # Mínimo de 400px
+        
+        # Altura: (1) Altura do frame de conteúdo + (2) Altura do frame de botões + margens
+        content_height = self.content_frame.winfo_reqheight()
+        button_height = self.btn_frame.winfo_reqheight()
+        
+        # Altura total = Top Padding (20) + Content Height + Spacing (20) + Button Height + Bottom Padding (20)
+        # Usando margens de 20px no frame principal (pack(padx=20, pady=20))
+        window_height = content_height + button_height + 60
+        
+        # Aplica o novo tamanho
+        self.geometry(f'{window_width}x{window_height}')
+        
+        # Centraliza na tela
+        screen_w = self.winfo_screenwidth()
+        screen_h = self.winfo_screenheight()
+        x = (screen_w // 2) - (window_width // 2)
+        y = (screen_h // 2) - (window_height // 2)
+        self.geometry(f'+{x}+{y}')
+
+
+    def _build_ui(self):
+        # 1. Frame principal (Padding)
+        main_frame = ctk.CTkFrame(self, fg_color="transparent")
+        # Usamos fill/expand e padding para que o cálculo de tamanho funcione melhor
+        main_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        # 2. Conteúdo (Ícone e Mensagem)
+        self.content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        self.content_frame.pack(fill='x', pady=(0, 20))
+        self.content_frame.grid_columnconfigure(0, weight=0) # Ícone
+        self.content_frame.grid_columnconfigure(1, weight=1) # Mensagem (Expansível)
+
+        # Ícone (Coluna 0, Centralizado Verticalmente)
+        ctk.CTkLabel(
+            self.content_frame, 
+            text=self.icon_text, 
+            font=ctk.CTkFont(size=30, weight="bold"), 
+            text_color=self.color
+        ).grid(row=0, column=0, padx=(0, 15), pady=5, sticky="nsw")
+        
+        # Mensagem (Coluna 1, Centralizado)
+        ctk.CTkLabel(
+            self.content_frame, 
+            text=self.message, 
+            # Define uma largura máxima de quebra de linha para limitar o quão larga a janela pode ficar
+            wraplength=300, 
+            # 💡 CENTRALIZAÇÃO DO TEXTO AQUI
+            justify="center", 
+            font=ctk.CTkFont(size=14),
+            # Usa 'ew' para que a label se expanda na coluna e 'n' para alinhar ao topo se for quebrar linha
+            anchor='center' 
+        ).grid(row=0, column=1, padx=(5, 0), pady=5, sticky="ew")
+
+        # 3. Botões
+        self.btn_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        self.btn_frame.pack(side='bottom', fill='x')
+        
+        # 💡 CENTRALIZAÇÃO DOS BOTÕES AQUI: Usamos grid para centralizar o frame interno.
+        self.btn_frame.columnconfigure(0, weight=1) 
+        inner_buttons_frame = ctk.CTkFrame(self.btn_frame, fg_color="transparent")
+        inner_buttons_frame.grid(row=0, column=0, pady=0, padx=0) 
+
+        if self.type == "confirm":
+            # Botões Sim/Não para askyesno
+            ctk.CTkButton(
+                inner_buttons_frame, 
+                text="✅ Sim", 
+                command=lambda: self._set_result(True), 
+                fg_color=COLORS["success"],
+                width=80 
+            ).pack(side='left', padx=(0, 20))
+            
+            ctk.CTkButton(
+                inner_buttons_frame, 
+                text="🚫 Não", 
+                command=lambda: self._set_result(False), 
+                fg_color=COLORS["danger"],
+                width=80 
+            ).pack(side='left', padx=(20, 0)) # Adicionado espaçamento à esquerda (5px)
+        else:
+            # Botão OK para showinfo, showwarning, showerror
+            ctk.CTkButton(
+                inner_buttons_frame, 
+                text="OK", 
+                command=lambda: self._set_result(True), 
+                fg_color=COLORS["default"],
+                width=80 
+            ).pack(side='left', padx=(5, 0))
+
+    def _set_result(self, res):
+        self.result = res
+        self.destroy()
+
+    @staticmethod
+    def showinfo(parent, title: str, message: str, logger: Logger):
+        dlg = CTkMessageDialog(parent, title, message, "info", logger)
+        parent.wait_window(dlg)
+        return True
+
+    @staticmethod
+    def showwarning(parent, title: str, message: str, logger: Logger):
+        dlg = CTkMessageDialog(parent, title, message, "warning", logger, icon="⚠️")
+        parent.wait_window(dlg)
+        return True
+
+    @staticmethod
+    def showerror(parent, title: str, message: str, logger: Logger):
+        dlg = CTkMessageDialog(parent, title, message, "error", logger, icon="❌")
+        parent.wait_window(dlg)
+        return True
+
+    @staticmethod
+    def askyesno(parent, title: str, message: str, logger: Logger):
+        dlg = CTkMessageDialog(parent, title, message, "confirm", logger)
+        parent.wait_window(dlg)
+        return dlg.result if dlg.result is not None else False
 
 
 # -----------------------------
@@ -1260,7 +1440,13 @@ class ButtonConfigDialog(ctk.CTkToplevel):
         Garante a remoção da referência da imagem, recria o IconLoader E
         TENTA DELETAR O ARQUIVO DO ÍCONE DA PASTA ICONS.
         """
-        if not messagebox.askyesno("Excluir", "Deseja remover o programa, o ícone e DELETAR o arquivo do ícone?"):
+        # SUBSTITUIÇÃO: Usando CTkMessageDialog.askyesno
+        if not CTkMessageDialog.askyesno(
+            self, 
+            "Excluir Botão", 
+            "Deseja remover o programa, o ícone e DELETAR o arquivo do ícone?", 
+            self.logger
+        ):
             return
 
         try:
@@ -1306,7 +1492,8 @@ class ButtonConfigDialog(ctk.CTkToplevel):
             
         except Exception as e:
             self.parent.logger.error(f"❌ Erro durante exclusão: {e}\n{traceback.format_exc()}")
-            messagebox.showerror("Erro", f"Ocorreu um erro durante a exclusão: {e}")
+            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showerror
+            CTkMessageDialog.showerror(self, "Erro", f"Ocorreu um erro durante a exclusão: {e}", self.logger)
                 
     def _save_and_close(self):
         raw_payload = self.payload_entry.get().strip()
@@ -1815,7 +2002,6 @@ class Esp32DeckApp(ctk.CTk):
         
         ctk.set_appearance_mode(self.config.data.get('appearance', {}).get('theme', 'System'))
         
-        # --- CORREÇÃO DE ERRO: Inicializar referências antes de construir UI ---
         # Componentes referenciados em _build_header e _build_connection_tab
         self.header_status_dot = None
         self.header_status_text = None
@@ -1836,7 +2022,7 @@ class Esp32DeckApp(ctk.CTk):
         self.port_entry = None
         self.search_btn = None
         self.centering_frame = None
-        self.remote_version_var = tk.StringVar(value=APP_VERSION) # Inicializa para a aba de Update
+        self.remote_version_var = tk.StringVar(value=APP_VERSION)
         self.remote_card_frame = None
         self.last_check_label = None
         self.check_update_btn = None
@@ -1844,12 +2030,10 @@ class Esp32DeckApp(ctk.CTk):
         self.status_title_label = None
         self.status_detail_label = None
         self.connection_type_var = tk.StringVar(value=self.config.data.get('serial', {}).get('type', 'Serial'))
-        # NOVO: Textbox de Detalhes da Conexão
         self.connection_details_textbox = None
-        # Fim da correção de inicialização
         
         self._build_ui()
-        self._load_appearance_settings() # Deve vir após _build_ui
+        self._load_appearance_settings() 
         
         self.logger.textbox = self.log_textbox
         
@@ -2103,7 +2287,8 @@ class Esp32DeckApp(ctk.CTk):
         self.logger.info(f"Minimizar para Tray {status}")
 
     def _reset_appearance(self):
-        if messagebox.askyesno("Confirmar Reset", "Restaurar padrões de aparência?"):
+        # SUBSTITUIÇÃO: Usando CTkMessageDialog.askyesno
+        if CTkMessageDialog.askyesno(self, "Confirmar Reset", "Restaurar padrões de aparência?", self.logger):
             self.config.data['appearance'] = {'theme': 'System', 'transparency': 1.0, 'color_scheme': 'Padrão', 'font_size': 'Médio', 'minimize_to_tray': False}
             
             ctk.set_appearance_mode('System')
@@ -2120,7 +2305,8 @@ class Esp32DeckApp(ctk.CTk):
             self._on_font_size_change('Médio')
             
             self.config.save()
-            messagebox.showinfo("Reset", "Configurações restauradas!")
+            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showinfo
+            CTkMessageDialog.showinfo(self, "Reset", "Configurações restauradas!", self.logger)
     
     def _build_ui(self):
         self._build_header()
@@ -2546,7 +2732,8 @@ class Esp32DeckApp(ctk.CTk):
         
         if not is_serial and not is_wifi:
             self.logger.warn("❌ Não conectado: Conecte ao USB ou Wi-Fi para enviar comandos de LED.")
-            messagebox.showwarning("Aviso", "Não é possível enviar comandos de LED. Conecte primeiro.")
+            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showwarning
+            CTkMessageDialog.showwarning(self, "Aviso", "Não é possível enviar comandos de LED. Conecte primeiro.", self.logger)
             return
 
         # Formato de Comando Sugerido para WS2812B: LED:<ID>:<RRGGBB>
@@ -2573,7 +2760,8 @@ class Esp32DeckApp(ctk.CTk):
         
         if not is_serial and not is_wifi:
             self.logger.warn("❌ Não conectado: Conecte à porta serial ou Wi-Fi para enviar comandos de LED.")
-            messagebox.showwarning("Aviso", "Não é possível enviar comandos de LED. Conecte primeiro.")
+            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showwarning
+            CTkMessageDialog.showwarning(self, "Aviso", "Não é possível enviar comandos de LED. Conecte primeiro.", self.logger)
             return
 
         # Formato de Comando Sugerido: ALL_LED:<COMMAND>
@@ -2594,23 +2782,28 @@ class Esp32DeckApp(ctk.CTk):
     def _backup_config(self): 
         try:
             path = self.config.backup()
-            messagebox.showinfo("Backup", f"Configuração salva em:\n{path}")
+            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showinfo
+            CTkMessageDialog.showinfo(self, "Backup", f"Configuração salva em:\n{path}", self.logger)
         except RuntimeError:
             pass # Cancelado
         except Exception as e:
-            messagebox.showerror("Erro", f"Falha ao salvar backup: {e}")
+            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showerror
+            CTkMessageDialog.showerror(self, "Erro", f"Falha ao salvar backup: {e}", self.logger)
 
     def _restore_config(self):
-        if not messagebox.askyesno("Restaurar", "Isto substituirá a configuração atual. Continuar?"):
+        # SUBSTITUIÇÃO: Usando CTkMessageDialog.askyesno
+        if not CTkMessageDialog.askyesno(self, "Restaurar Configuração", "Isto substituirá a configuração atual. Continuar?", self.logger):
             return
         try:
             path = self.config.restore()
             self.refresh_all()
-            messagebox.showinfo("Restauração", f"Configuração carregada de:\n{path}")
+            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showinfo
+            CTkMessageDialog.showinfo(self, "Restauração", f"Configuração carregada de:\n{path}", self.logger)
         except RuntimeError:
             pass # Cancelado
         except Exception as e:
-            messagebox.showerror("Erro", f"Falha ao restaurar: {e}")
+            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showerror
+            CTkMessageDialog.showerror(self, "Erro", f"Falha ao restaurar: {e}", self.logger)
 
     def _build_connection_status_card(self, parent):
         """
@@ -2662,7 +2855,6 @@ class Esp32DeckApp(ctk.CTk):
         )
         self.dash_sub_text.grid(row=1, column=1, padx=(0, 15), pady=(0, 10), sticky='w')
         
-        # O self.details_frame não é mais usado, mas a variável precisa ser setada para evitar erros.
         self.details_frame = self.status_card
         
         # Remove a construção dos antigos detalhes:
@@ -2688,7 +2880,6 @@ class Esp32DeckApp(ctk.CTk):
         # 1. Segmented Button para escolher o tipo de conexão
         self.connection_type_switcher = ctk.CTkSegmentedButton(
             config_frame, 
-            # AQUI: A string 'Serial' é trocada por 'USB' para fins de interface
             values=['USB', 'Wi-Fi'], 
             command=self._on_connection_type_change,
             variable=self.connection_type_var
@@ -2728,29 +2919,22 @@ class Esp32DeckApp(ctk.CTk):
         )
         self.disconnect_btn.pack(fill='x')
         
-        # 5. Inicializa o estado correto (agora é seguro chamar)
-        # Passa o tipo ORIGINAL para garantir que a lógica use "Serial"
         self._on_connection_type_change(self.connection_type_var.get())
         
         # --- COLUNA 1: Status e Detalhes ---
         status_and_details_frame = ctk.CTkFrame(parent, corner_radius=10)
         status_and_details_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 10), pady=10)
         
-        # 1. Novo Status Card (Mais compacto)
         self._build_connection_status_card(status_and_details_frame) 
         
-        # 2. Log de Eventos da Conexão (Novo)
         log_card = ctk.CTkFrame(status_and_details_frame, corner_radius=10)
         log_card.pack(fill='both', expand=True, padx=10, pady=(10, 20))
         
         ctk.CTkLabel(log_card, text="Detalhes da Conexão", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor='w', padx=15, pady=(10, 5))
         
-        # Substitui o 'details_frame' antigo por um Textbox mais moderno
         self.connection_details_textbox = ctk.CTkTextbox(log_card, height=100, state='disabled')
         self.connection_details_textbox.pack(fill='both', expand=True, padx=15, pady=(0, 15))
 
-        # 6. Força a atualização visual inicial
-        # É importante passar o tipo de conexão real (Serial ou Wi-Fi) para a lógica do status
         self._set_header_visuals(self.serial_manager.is_connected or self.wifi_manager.is_connected, 'Serial' if self.connection_type_var.get() == 'USB' else self.connection_type_var.get())
 
 
@@ -2777,7 +2961,7 @@ class Esp32DeckApp(ctk.CTk):
         ctk.CTkFrame(self.serial_frame, height=2, fg_color=self.colors["secondary"]).pack(fill='x', padx=5, pady=20)
 
         baud_frame = ctk.CTkFrame(self.serial_frame, fg_color="transparent")
-        baud_frame.pack(fill='x', pady=5)
+        baud_frame.pack(fill='x')
         
         ctk.CTkLabel(baud_frame, text="Velocidade (Baud):", font=ctk.CTkFont(weight="bold"), anchor="w").pack(fill='x')
         
@@ -2787,7 +2971,11 @@ class Esp32DeckApp(ctk.CTk):
         self.baud_option.pack(fill='x', pady=5)
 
     def _build_wifi_settings_frame(self):
-        initial_ip = self.config.data.get('wifi', {}).get('ip', '192.168.1.100')
+        # Valor padrão do IP
+        DEFAULT_IP = '192.168.1.100'
+        
+        # 1. Tenta carregar o IP salvo. Se não houver, retorna o DEFAULT_IP.
+        initial_ip = self.config.data.get('wifi', {}).get('ip', DEFAULT_IP)
         initial_port = self.config.data.get('wifi', {}).get('port', 8000)
 
         self.wifi_frame = ctk.CTkFrame(self.connection_settings_frame, fg_color="transparent")
@@ -2800,8 +2988,13 @@ class Esp32DeckApp(ctk.CTk):
         ip_input_frame = ctk.CTkFrame(ip_frame, fg_color="transparent")
         ip_input_frame.pack(fill='x')
         
-        self.ip_entry = ctk.CTkEntry(ip_input_frame, placeholder_text="Ex: 192.168.1.100")
-        self.ip_entry.insert(0, initial_ip)
+        # 2. Define o placeholder_text usando o IP padrão como exemplo.
+        self.ip_entry = ctk.CTkEntry(ip_input_frame, placeholder_text=f"Ex: {DEFAULT_IP}")
+        
+        # 3. Só insere o valor salvo se ele for diferente do valor padrão ou se for vazio.
+        if initial_ip and initial_ip != DEFAULT_IP:
+            self.ip_entry.insert(0, initial_ip)
+            
         self.ip_entry.pack(side='left', fill='x', expand=True, pady=5, padx=(0, 5))
         
         self.search_btn = ctk.CTkButton(
@@ -2825,17 +3018,13 @@ class Esp32DeckApp(ctk.CTk):
         self.port_entry.pack(fill='x', pady=5)
 
     def _on_connection_type_change(self, value):
-        # Remove todos os widgets do container antes de adicionar o novo
         for widget in self.connection_settings_frame.winfo_children():
             widget.pack_forget()
             
-        # O valor aqui pode ser 'USB' (nova UI) ou 'Serial' (config antiga)
-        # Normalizamos para 'Serial' para salvar e usar a lógica interna
         if value == 'USB' or value == 'Serial':
             self.serial_frame.pack(fill='both', expand=True)
             saved_value = 'Serial'
-            
-            # Se for 'USB', atualiza a variável para 'USB' para manter a seleção visual
+        
             if value == 'USB':
                  self.connection_type_var.set('USB') 
             
@@ -2897,7 +3086,8 @@ class Esp32DeckApp(ctk.CTk):
             port = int(self.port_entry.get().strip())
         except ValueError:
             self.logger.error("Porta inválida.")
-            messagebox.showerror("Erro", "A porta deve ser um número válido (Ex: 8000).")
+            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showerror
+            CTkMessageDialog.showerror(self, "Erro", "A porta deve ser um número válido (Ex: 8000).", self.logger)
             return
 
         if not host or port <= 0:
@@ -2930,10 +3120,12 @@ class Esp32DeckApp(ctk.CTk):
             self.ip_entry.delete(0, 'end')
             self.ip_entry.insert(0, ip)
             self.logger.info(f"Dispositivo Wi-Fi encontrado em: {ip}")
-            messagebox.showinfo("Sucesso", f"Dispositivo encontrado em: {ip}")
+            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showinfo
+            CTkMessageDialog.showinfo(self, "Sucesso", f"Dispositivo encontrado em: {ip}", self.logger)
         else:
             self.logger.warn("Dispositivo Wi-Fi não encontrado.")
-            messagebox.showwarning("Aviso", "Dispositivo não encontrado. Verifique o Wi-Fi do ESP32 e o código de broadcast.")
+            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showwarning
+            CTkMessageDialog.showwarning(self, "Aviso", "Dispositivo não encontrado. Verifique o Wi-Fi do ESP32.", self.logger)
 
     def update_serial_ports(self):
         ports = self.serial_manager.list_ports() or ['Nenhuma']
@@ -2954,9 +3146,11 @@ class Esp32DeckApp(ctk.CTk):
         
     def _save_all(self):
         if self.config.save(): 
-            messagebox.showinfo("Sucesso", "Configurações salvas!")
+            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showinfo
+            CTkMessageDialog.showinfo(self, "Sucesso", "Configurações salvas!", self.logger)
         else: 
-            messagebox.showerror("Erro", "Erro ao salvar!")
+            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showerror
+            CTkMessageDialog.showerror(self, "Erro", "Erro ao salvar!", self.logger)
             
     def _show_about(self): AboutDialog(self)
 
@@ -3271,7 +3465,8 @@ class Esp32DeckApp(ctk.CTk):
                     command=lambda: webbrowser.open(res.get('download_url'))
                 )
                 
-                if messagebox.askyesno('Atualização', f'Nova versão {latest} encontrada!\nDeseja abrir a página de download agora?'):
+                # SUBSTITUIÇÃO: Usando CTkMessageDialog.askyesno
+                if CTkMessageDialog.askyesno(self, 'Atualização', f'Nova versão {latest} encontrada!\nDeseja abrir a página de download agora?', self.logger):
                     webbrowser.open(res.get('download_url'))
             else:
                 self.logger.info('Sistema já está atualizado.')
