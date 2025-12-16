@@ -1498,18 +1498,20 @@ class WifiManager:
         return self._is_connected
 
     def send_command(self, command: str) -> bool:
+        # CORREÇÃO: Verifica se o socket existe E se ainda está conectado (flag)
         if self._is_connected and self._socket:
             try:
                 self._socket.sendall((command + "\n").encode('utf-8'))
                 return True
             except Exception as e:
+                # O WinError 10038 é capturado aqui, e a desconexão é chamada para limpeza
                 self.logger.error(f"Erro ao enviar comando Wi-Fi: {e}")
-                self.disconnect() # Desconecta se falhar o envio
+                self.disconnect() 
                 return False
         return False
 
     def connect(self, host: str, port: int) -> bool:
-        self.disconnect() # Garante que está desconectado antes de tentar
+        self.disconnect() 
         self.host = host
         self.port = port
         
@@ -1517,17 +1519,17 @@ class WifiManager:
         
         try:
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            # Define um timeout para a tentativa de conexão
             self._socket.settimeout(3) 
             self._socket.connect((host, port))
-            self._socket.settimeout(None) # Remove o timeout para a thread de leitura
+            self._socket.settimeout(None) 
             
             self._running = True
             self._is_connected = True
             self._thread = threading.Thread(target=self._reader_loop, daemon=True)
             self._thread.start()
             
-            self.send_command("CONNECTED") # Envia mensagem de conexão
+            # Envia mensagem de conexão
+            self.send_command("CONNECTED") 
             
             self.logger.info(f'✅ Conectado via Wi-Fi a {host}:{port}')
             if self.on_status_change: self.on_status_change(True, self.connection_type)
@@ -1540,36 +1542,48 @@ class WifiManager:
             return False
 
     def disconnect(self):
+        # Passo 1: Sinaliza a thread para parar
         self._running = False
         self._is_connected = False
+        
+        # Passo 2: Fecha o socket de forma limpa (protegido contra a thread de leitura)
         if self._socket:
-            try:
-                self.send_command("DISCONNECT") # Tenta enviar antes de fechar
+            # Tenta enviar DISCONNECT uma última vez, caso a thread principal chame disconnect
+            try: self._socket.sendall(b"DISCONNECT\n")
             except Exception: pass
             
             try:
+                # CORREÇÃO: Fechar o socket aqui fará com que o select na thread falhe,
+                # permitindo que a thread termine naturalmente.
+                self._socket.shutdown(socket.SHUT_RDWR)
                 self._socket.close()
                 self.logger.info('🔌 Conexão Wi-Fi fechada')
             except Exception: pass
             
+            # Passo 3: Limpa a referência
+            self._socket = None
+
         if self.on_status_change: self.on_status_change(False, self.connection_type)
 
     def _reader_loop(self):
         try:
+            # CORREÇÃO: Loop verifica self._running e self._socket
             while self._running and self._socket:
                 try:
                     # Usa 'select' para non-blocking read
                     ready_to_read, _, _ = select.select([self._socket], [], [], 0.1)
                     
                     if ready_to_read:
+                        # Verifica novamente self._socket antes de usar
+                        if not self._socket: break
+                        
                         data = self._socket.recv(1024)
                         if not data:
                             self.logger.warn("Conexão Wi-Fi fechada pelo host remoto.")
-                            break # Sai do loop se não receber dados
+                            break 
                             
                         self.read_buffer += data.decode('utf-8', errors='ignore')
                         
-                        # Processa linhas completas (separadas por '\n')
                         while '\n' in self.read_buffer:
                             line, self.read_buffer = self.read_buffer.split('\n', 1)
                             line = line.strip()
@@ -1577,19 +1591,20 @@ class WifiManager:
                                 self.logger.debug(f'📨 Recebido Wi-Fi: {line}')
                                 if self.on_message: self.on_message(line)
 
-                    time.sleep(0.01) # Pequeno sleep para evitar uso excessivo da CPU
+                    time.sleep(0.01)
                         
                 except socket.timeout:
-                    # Timeout do select (não é um erro)
                     continue
+                # Captura de erro 10038 (Bad file descriptor) ou fechamento forçado
                 except socket.error as e:
-                    self.logger.error(f"Erro de socket Wi-Fi: {e}")
+                    self.logger.error(f"Erro de socket Wi-Fi no loop: {e}")
                     break
                 except Exception as e:
                     self.logger.error(f"Erro inesperado no loop Wi-Fi: {e}")
                     break
         finally:
-            self.disconnect() 
+            # Garante que o estado seja limpo quando a thread morre
+            self.disconnect() # Chama disconnect para limpar o estado
 
     def search_device(self) -> Optional[str]:
         """
