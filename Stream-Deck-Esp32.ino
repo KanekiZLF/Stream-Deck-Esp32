@@ -1,5 +1,5 @@
 // ===================================================================================
-// === STREAM DECK FÍSICO - MÚLTIPLAS INTERFACES =====================================
+// === ESP32 DECK FÍSICO - MÚLTIPLAS INTERFACES ======================================
 // ===================================================================================
 
 #include <TFT_eSPI.h>
@@ -9,7 +9,7 @@
 #include <DNSServer.h>
 #include <Preferences.h>
 #include <FS.h>
-#include <SPIFFS.h> 
+#include <SPIFFS.h>
 #include <WiFiUdp.h>
 
 // =========================================================================
@@ -26,9 +26,9 @@ const int UDP_SEARCH_PORT = 4210;
 const char *UDP_DISCOVER_MSG = "ESP32_DECK_DISCOVER";
 const char *UDP_ACK_MSG = "ESP32_DECK_ACK";
 
-// Configuração da Senha de Acesso (Sequência: 1, 2, 3)
+// Configuração da Senha de Acesso (Sequência: 1, 4, 8)
 const int SEQUENCE_TIMEOUT_MS = 2000; // 2 segundos
-const int SEQUENCE_TARGET[] = {1, 2, 3};
+const int SEQUENCE_TARGET[] = {1, 4, 8};
 const int SEQUENCE_LENGTH = 3;
 
 // =========================================================================
@@ -37,7 +37,7 @@ const int SEQUENCE_LENGTH = 3;
 const int dataPin = 17;
 const int clockPin = 21;
 const int latchPin = 22;
-const int numBits = 8; 
+const int numBits = 8;
 
 // =========================================================================
 // === CONFIGURAÇÕES DO DISPLAY ============================================
@@ -49,7 +49,12 @@ TFT_eSPI tft = TFT_eSPI();
 // =========================================================================
 
 // Enum para rastrear o protocolo ativo
-enum ConnectionProtocol { NONE, USB, WIFI };
+enum ConnectionProtocol
+{
+  NONE,
+  USB,
+  WIFI
+};
 ConnectionProtocol activeProtocol = NONE;
 
 bool inSettingsMenu = false;
@@ -62,9 +67,10 @@ WebServer server(80);
 DNSServer dnsServer;
 WiFiUDP Udp;
 
-bool lastOverallConnectionStatus = false; 
-// Variáveis para Sequência de Acesso 
-int sequenceState = 0; 
+bool lastOverallConnectionStatus = false;
+bool wifiStatusHandled = false;
+// Variáveis para Sequência de Acesso
+int sequenceState = 0;
 unsigned long sequenceTimer = 0;
 
 // =========================================================================
@@ -89,7 +95,7 @@ void initButtons();
 void drawBootScreen();
 void drawMainInterface();
 void drawSettingsPanel();
-void drawAccessPointInfo(); 
+void drawAccessPointInfo();
 void drawConfigPortalScreen();
 void updateConnectionStatus(ConnectionProtocol protocol);
 void drawStatusMessage(const String &message);
@@ -103,17 +109,17 @@ void handleWiFiSave();
 
 int readButtons();
 int mapButton(int bit);
-void checkButtons(); 
+void checkButtons();
 void handleButtonPress(int buttonNumber);
 void checkConnectionChange();
-void checkUdpSearch(); 
+void checkUdpSearch();
 
 void drawPanelCompact();
 void drawPanelModern();
-void drawPanelMinimal(); 
-void drawPanelTechnical(); 
-void drawPanelGaming(); 
-void drawPanelClassic(); 
+void drawPanelMinimal();
+void drawPanelTechnical();
+void drawPanelGaming();
+void drawPanelClassic();
 
 // =========================================================================
 // === IMPLEMENTAÇÕES DE FUNÇÕES ===========================================
@@ -121,7 +127,8 @@ void drawPanelClassic();
 
 void checkUdpSearch()
 {
-  if (WiFi.status() != WL_CONNECTED) return;
+  if (WiFi.status() != WL_CONNECTED)
+    return;
 
   int packetSize = Udp.parsePacket();
   if (packetSize)
@@ -132,19 +139,19 @@ void checkUdpSearch()
     {
       incomingPacket[len] = 0;
       String receivedMsg = String(incomingPacket);
-      
+
       if (receivedMsg == UDP_DISCOVER_MSG)
       {
         IPAddress remoteIP = Udp.remoteIP();
         int remotePort = Udp.remotePort();
-        
+
         Serial.print("🔍 Busca UDP recebida de: ");
         Serial.println(remoteIP.toString());
-        
+
         Udp.beginPacket(remoteIP, remotePort);
-        Udp.write((const uint8_t*)UDP_ACK_MSG, strlen(UDP_ACK_MSG));
+        Udp.write((const uint8_t *)UDP_ACK_MSG, strlen(UDP_ACK_MSG));
         Udp.endPacket();
-        
+
         Serial.println("ACK UDP enviado.");
       }
     }
@@ -153,7 +160,7 @@ void checkUdpSearch()
 
 void drawStatusMessage(const String &message)
 {
-  const int STATUS_AREA_Y = 150; 
+  const int STATUS_AREA_Y = 150;
   const int LINE_HEIGHT = 12;
   const int PADDING_TOP = 5;
 
@@ -161,7 +168,7 @@ void drawStatusMessage(const String &message)
   tft.setTextColor(TFT_YELLOW);
   tft.setTextSize(1);
   tft.setTextDatum(TL_DATUM);
-  
+
   if (message.length() > 20)
   {
     tft.drawString(message.substring(0, 20), 15, STATUS_AREA_Y + PADDING_TOP);
@@ -210,7 +217,7 @@ void drawBootScreen()
 
   tft.setTextSize(1);
   tft.setTextColor(TFT_WHITE);
-  tft.drawString("v2.4 - Multi Interface", tft.width() / 2, tft.height() / 2 + 25);
+  tft.drawString("v2.6 - Multi Interface", tft.width() / 2, tft.height() / 2 + 25);
   tft.setTextColor(TFT_YELLOW);
   tft.drawString("github.com/KanekiZLF", tft.width() / 2, tft.height() / 2 + 40);
 }
@@ -233,10 +240,13 @@ void checkSerialCommands()
     else if (message == "DISCONNECT")
     {
       Serial.println("👋 Software se desconectou (USB)");
-      if (client.connected()) {
-          activeProtocol = WIFI;
-      } else {
-          activeProtocol = NONE;
+      if (client.connected())
+      {
+        activeProtocol = WIFI;
+      }
+      else
+      {
+        activeProtocol = NONE;
       }
     }
     else if (message == "PING")
@@ -252,6 +262,7 @@ void updateConnectionStatus(ConnectionProtocol protocol)
   tft.setTextDatum(TC_DATUM);
   tft.setTextSize(1);
 
+  // 1. Status de Prontidão (Protocolo USB/Wi-Fi Client)
   if (protocol != NONE)
   {
     tft.setTextColor(CONNECTED_COLOR);
@@ -269,15 +280,15 @@ void drawPanelCompact()
 {
   tft.setTextSize(1);
   tft.setTextDatum(TL_DATUM);
-// Fundo do painel
+  // Fundo do painel
   tft.fillRoundRect(10, 65, tft.width() - 20, 70, 5, TFT_DARKGREY);
   tft.drawRoundRect(10, 65, tft.width() - 20, 70, 5, ACCENT_COLOR);
 
   // Título
   tft.setTextColor(ACCENT_COLOR);
   tft.setTextDatum(TC_DATUM);
-  tft.drawString("ESP32 DECK v2.4", tft.width() / 2, 70);
-// Informações do DEV
+  tft.drawString("ESP32 DECK v2.6", tft.width() / 2, 70);
+  // Informações do DEV
   tft.setTextColor(TFT_CYAN);
   tft.setTextDatum(TL_DATUM);
   tft.drawString("GitHub:", 15, 85);
@@ -286,13 +297,21 @@ void drawPanelCompact()
 
   // Informações técnicas
   tft.setTextColor(TFT_WHITE);
-  tft.drawString("Firmware: v2.4", 15, 110);
+  tft.drawString("Firmware: v2.6", 15, 110);
   tft.drawString("Dev: Luiz F. R. Pimentel", 15, 122);
-  
+
   // Exibe IP / Configuração AP
-  if (WiFi.isConnected()) {
-      tft.setTextColor(TFT_GREEN);
-      tft.drawString(String("IP: ") + WiFi.localIP().toString(), 15, 98); 
+  if (WiFi.isConnected())
+  {
+    tft.setTextColor(TFT_GREEN);
+    tft.drawString(String("IP: ") + WiFi.localIP().toString(), 15, 98);
+  }
+  else
+  {
+    // Se não conectado, mostra as credenciais do AP
+    tft.setTextColor(TFT_ORANGE);
+    tft.drawString(String("Wi-Fi Desconectado"), 15, 98);
+    tft.setTextColor(TFT_WHITE);
   }
 }
 
@@ -306,22 +325,22 @@ void drawMainInterface()
   tft.setTextDatum(TC_DATUM);
   tft.drawString("ESP32 STREAM DECK", tft.width() / 2, 8);
   tft.drawFastHLine(10, 20, tft.width() - 20, TFT_DARKGREY);
-// Área de status
+  // Área de status
   tft.fillRoundRect(10, 25, tft.width() - 20, 25, 5, TFT_DARKGREY);
   updateConnectionStatus(activeProtocol); // Usa o protocolo ativo
 
   tft.drawFastHLine(10, 55, tft.width() - 20, TFT_DARKGREY);
-// ✅ ESCOLHA SUA INTERFACE PREFERIDA AQUI:
+  // ✅ ESCOLHA SUA INTERFACE PREFERIDA AQUI:
   // ⭐ DESCOMENTE APENAS UMA DAS LINHAS ABAIXO:
 
   drawPanelCompact(); // ⭐ Opção 1 - Mais compacta
-  // drawPanelModern();     // ⭐ Opção 2 - Estilo moderno
+  // drawPanelModern();    // ⭐ Opção 2 - Estilo moderno
   // drawPanelMinimal(); // ⭐ Opção 3 - Minimalista
   // drawPanelTechnical();  // ⭐ Opção 4 - Técnico
   // drawPanelGaming(); // ⭐ Opção 5 - Estilo gaming
   // drawPanelClassic(); // ⭐ Opção 6 - Clássico
 
-// Área de mensagens
+  // Área de mensagens
   tft.drawFastHLine(10, 150, tft.width() - 20, TFT_DARKGREY);
   tft.setTextColor(TFT_LIGHTGREY);
   tft.setTextDatum(BC_DATUM);
@@ -345,15 +364,18 @@ void drawPanelModern()
 
   // Informações em grid
   tft.setTextColor(TFT_WHITE);
-  tft.drawString("FIRMWARE: v2.4", 15, 115);
+  tft.drawString("FIRMWARE: v2.6", 15, 115);
   tft.drawString(String(numBits) + " Botoes Ativos", 90, 115);
   tft.drawString("Dev: Luiz F. R. Pimentel", 15, 127);
-  if (WiFi.isConnected()) {
-      tft.setTextColor(TFT_YELLOW);
-      tft.drawString(String("IP: ") + WiFi.localIP().toString(), 90, 127);
-  } else {
-      tft.setTextColor(TFT_RED);
-      tft.drawString(String("AP: ") + SSID_AP, 90, 127);
+  if (WiFi.isConnected())
+  {
+    tft.setTextColor(TFT_YELLOW);
+    tft.drawString(String("IP: ") + WiFi.localIP().toString(), 90, 127);
+  }
+  else
+  {
+    tft.setTextColor(TFT_RED);
+    tft.drawString(String("AP: ") + SSID_AP, 90, 127);
   }
 }
 
@@ -373,23 +395,24 @@ void drawPanelMinimal()
   tft.drawString(activeProtocol != NONE ? "SISTEMA ATIVO" : "AGUARDANDO", 15, 90);
 
   tft.setTextColor(TFT_LIGHTGREY);
-  tft.drawString(String("v2.4 | ") + String(numBits) + " BTNS", 15, 103);
+  tft.drawString(String("v2.6 | ") + String(numBits) + " BTNS", 15, 103);
   tft.drawString("Serial: 115200", 15, 115);
   tft.drawString("Luiz F. R. Pimentel", 15, 127);
-  if (WiFi.isConnected()) {
-      tft.setTextColor(TFT_YELLOW);
-      tft.drawString(String("IP: ") + WiFi.localIP().toString(), 110, 115);
-  } else {
-      tft.setTextColor(TFT_RED);
-      tft.drawString(String("AP: ") + SSID_AP, 110, 115);
+  if (WiFi.isConnected())
+  {
+    tft.setTextColor(TFT_YELLOW);
+    tft.drawString(String("IP: ") + WiFi.localIP().toString(), 110, 115);
+  }
+  else
+  {
+    tft.setTextColor(TFT_RED);
+    tft.drawString(String("AP: ") + SSID_AP, 110, 115);
   }
 }
 
-void drawPanelTechnical() { /* (Implementação Completa) */ }
-void drawPanelGaming() { /* (Implementação Completa) */ }
-void drawPanelClassic() { /* (Implementação Completa) */ }
+void drawPanelTechnical() void drawPanelGaming() void drawPanelClassic()
 
-void startConfigPortal()
+    void startConfigPortal()
 {
   wifiConfigMode = true;
 
@@ -402,15 +425,17 @@ void startConfigPortal()
   IPAddress apIP(192, 168, 4, 1);
   WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
 
-  DNSServer dnsServer; 
-  dnsServer.start(53, "*", apIP); 
+  DNSServer dnsServer;
+  dnsServer.start(53, "*", apIP);
 
-  server.on("/", handleRoot); 
+  server.on("/", handleRoot);
   server.on("/save", handleWiFiSave);
   server.begin();
-  
-  Serial.print("AP: "); Serial.println(SSID_AP);
-  Serial.print("IP: "); Serial.println(WiFi.softAPIP());
+
+  Serial.print("AP: ");
+  Serial.println(SSID_AP);
+  Serial.print("IP: ");
+  Serial.println(WiFi.softAPIP());
 }
 
 void handleRoot()
@@ -452,21 +477,32 @@ void handleWiFiSave()
   String ssid = server.arg("ssid");
   String pass = server.arg("pass");
 
+  // 1. SALVA CREDENCIAIS
+  preferences.begin(PREFS_KEY, false);
   preferences.putString("ssid", ssid);
   preferences.putString("pass", pass);
   preferences.end();
-  
-  String msg = "Credenciais salvas. Tentando conectar a " + ssid + ". Reiniciando...";
+
+  String msg = "Credenciais salvas. Tentando conectar a " + ssid + ". Voltando para operação normal...";
   server.send(200, "text/plain", msg);
 
-  // CORREÇÃO DA FALHA NA CONEXÃO: Desliga os serviços de AP de forma limpa antes de reiniciar
-  wifiConfigMode = false;
-  WiFi.softAPdisconnect(true);
+  // 2. DESLIGA O AP
   server.close();
-  
-  // O restart é crucial para tentar conectar com as novas credenciais
-  delay(1000); 
-  ESP.restart();
+  wifiConfigMode = false;
+
+  // 3. LIMPA A PILHA DE REDE
+  WiFi.softAPdisconnect(true);
+  WiFi.disconnect(true); // Força a desconexão e limpa a memória (true)
+
+  // 4. MUDA O MODO E INICIA A CONEXÃO STA
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid.c_str(), pass.c_str());
+
+  // 5. Atualiza o Protocolo e Display
+  activeProtocol = NONE;
+  wifiStatusHandled = false;
+  drawMainInterface();
+  drawStatusMessage("Wi-Fi salvo. Tentando conectar...");
 }
 
 void drawConfigPortalScreen()
@@ -476,15 +512,15 @@ void drawConfigPortalScreen()
   tft.setTextSize(2);
   tft.setTextDatum(MC_DATUM);
   tft.drawString("MODO DE CONFIG.", tft.width() / 2, tft.height() / 2 - 40);
-  
+
   tft.setTextSize(1);
   tft.setTextColor(TFT_WHITE);
   tft.drawString("1. Conecte-se a rede Wi-Fi:", tft.width() / 2, tft.height() / 2);
-  
+
   tft.setTextColor(ACCENT_COLOR);
   tft.drawString(String("SSID: ") + SSID_AP, tft.width() / 2, tft.height() / 2 + 15);
   tft.drawString(String("PASS: ") + PASS_AP, tft.width() / 2, tft.height() / 2 + 27);
-  
+
   tft.setTextColor(INFO_COLOR);
   tft.drawString("2. Acesse 192.168.4.1 no navegador.", tft.width() / 2, tft.height() / 2 + 50);
 }
@@ -497,27 +533,27 @@ void drawAccessPointInfo()
   tft.setTextSize(2);
   tft.setTextDatum(MC_DATUM);
   tft.drawString("CONFIGURAR WI-FI", tft.width() / 2, tft.height() / 2 - 50);
-  
+
   tft.setTextSize(1);
   tft.setTextColor(TFT_WHITE);
   tft.drawString("Conecte seu dispositivo a:", tft.width() / 2, tft.height() / 2 - 10);
-  
+
   tft.setTextColor(ACCENT_COLOR);
   tft.drawString(String("SSID: ") + SSID_AP, tft.width() / 2, tft.height() / 2 + 10);
   tft.drawString(String("PASS: ") + PASS_AP, tft.width() / 2, tft.height() / 2 + 25);
-  
+
   tft.setTextColor(INFO_COLOR);
   tft.drawString("Iniciando WebPortal em 5s...", tft.width() / 2, tft.height() / 2 + 50);
 }
-
 
 void initWiFi()
 {
   String ssid = preferences.getString("ssid", "");
   String pass = preferences.getString("pass", "");
-  
+
   if (ssid.length() > 0)
   {
+    WiFi.mode(WIFI_STA);
     WiFi.begin(ssid.c_str(), pass.c_str());
 
     for (int i = 0; i < 30 && WiFi.status() != WL_CONNECTED; i++)
@@ -525,31 +561,31 @@ void initWiFi()
       delay(500);
       Serial.print(".");
     }
-    
+
     if (WiFi.status() == WL_CONNECTED)
     {
       Serial.println("\n✅ Conectado à rede Wi-Fi: " + WiFi.SSID());
       Serial.print("IP: ");
       Serial.println(WiFi.localIP());
-      return; 
+      return;
     }
     else
     {
-      // Se falhar a conexão, limpa credenciais para que o AP seja iniciado manualmente
+      // Se falhar a conexão, limpa credenciais
       Serial.println("\n❌ Falha ao conectar. Limpando credenciais e operando offline.");
       preferences.clear();
+      preferences.end();
     }
   }
-  
+
   activeProtocol = NONE;
 }
-
 
 void resetWiFiCredentials()
 {
   // Sai do menu
-  inSettingsMenu = false; 
-  
+  inSettingsMenu = false;
+
   // Limpa as credenciais salvas
   tft.fillScreen(BACKGROUND_COLOR);
   tft.setTextColor(WARNING_COLOR);
@@ -559,17 +595,21 @@ void resetWiFiCredentials()
   tft.setTextSize(1);
   tft.setTextColor(TFT_WHITE);
   tft.drawString("Limpando credenciais anteriores...", tft.width() / 2, tft.height() / 2);
-  
+
+  // Limpa NVS e força a escrita
   preferences.clear();
   preferences.end();
-  
+
+  // Limpa a pilha de Wi-Fi antes de iniciar o AP (Resolve o erro 12308)
+  WiFi.disconnect(true);
+
   // Transição: Mostra as informações do AP (SSID e Senha)
   drawAccessPointInfo();
-  
-  delay(5000); 
-  
+
+  delay(5000);
+
   // Entra no Portal de Configuração
-  startConfigPortal(); 
+  startConfigPortal();
 }
 
 void drawSettingsPanel()
@@ -587,15 +627,15 @@ void drawSettingsPanel()
   tft.setTextColor(TFT_WHITE);
   tft.drawString("STATUS:", 10, 40);
   tft.drawString(WiFi.isConnected() ? "CONECTADO" : "DESCONECTADO", 70, 40);
-  
+
   tft.setTextColor(TFT_LIGHTGREY);
   tft.drawString("SSID:", 10, 55);
   tft.drawString(WiFi.isConnected() ? WiFi.SSID().c_str() : "N/A", 70, 55);
-  
+
   tft.setTextColor(TFT_YELLOW);
   tft.drawString("IP:", 10, 70);
   tft.drawString(WiFi.isConnected() ? WiFi.localIP().toString() : "0.0.0.0", 70, 70);
-  
+
   tft.setTextColor(ACCENT_COLOR);
   tft.drawString("PORTA TCP:", 10, 85);
   tft.drawString(String(TCP_PORT), 70, 85);
@@ -605,34 +645,45 @@ void drawSettingsPanel()
   // Opções de Menu
   tft.setTextSize(1);
   tft.setTextColor(TFT_RED);
-  tft.drawString("BTN 1: CONFIGURAR NOVO WI-FI (AP)", 10, 115);
+  tft.drawString("BTN 1: CONFIGURAR NOVO WI-FI (AP)", 10, 110);
   tft.setTextColor(SUCCESS_COLOR);
-  tft.drawString("BTN 2: SAIR DO MENU", 10, 130);
-  
-  tft.setTextColor(INFO_COLOR);
-  tft.drawString("Sequencia 1-2-3 para Menu", 10, 160); 
+  tft.drawString("BTN 2: SAIR DO MENU", 10, 125);
 }
-
 
 int mapButton(int bit)
 {
   int buttonNumber = 0;
-  
+
   // Mapeamento para 8 botões (se numBits=8)
   switch (bit)
   {
-    case 7: buttonNumber = 1; break; 
-    case 6: buttonNumber = 2; break;
-    case 5: buttonNumber = 3; break;
-    case 4: buttonNumber = 4; break;
-    case 3: buttonNumber = 5; break;
-    case 2: buttonNumber = 6; break;
-    case 1: buttonNumber = 7; break;
-    case 0: buttonNumber = 8; break; 
+  case 7:
+    buttonNumber = 8;
+    break;
+  case 6:
+    buttonNumber = 7;
+    break;
+  case 5:
+    buttonNumber = 6;
+    break;
+  case 4:
+    buttonNumber = 5;
+    break;
+  case 3:
+    buttonNumber = 1;
+    break;
+  case 2:
+    buttonNumber = 2;
+    break;
+  case 1:
+    buttonNumber = 3;
+    break;
+  case 0:
+    buttonNumber = 4;
+    break;
   }
   return buttonNumber;
 }
-
 
 int readButtons()
 {
@@ -645,12 +696,12 @@ int readButtons()
   for (int i = 0; i < numBits; i++)
   {
     data = (data << 1) |
-    digitalRead(dataPin);
+           digitalRead(dataPin);
     digitalWrite(clockPin, HIGH);
     delayMicroseconds(1);
     digitalWrite(clockPin, LOW);
   }
-  
+
   return data;
 }
 
@@ -658,9 +709,11 @@ void checkButtons()
 {
   int currentButtonStates = readButtons();
 
-  // --- Lógica de Sequência Temporizada (1-2-3) para o Menu ---
-  if (!inSettingsMenu) {
-    if (sequenceState > 0 && millis() - sequenceTimer > SEQUENCE_TIMEOUT_MS) {
+  // --- Lógica de Sequência Temporizada (1-4-8) para o Menu ---
+  if (!inSettingsMenu)
+  {
+    if (sequenceState > 0 && millis() - sequenceTimer > SEQUENCE_TIMEOUT_MS)
+    {
       // Timeout: Reinicia a sequência se passar o tempo limite
       sequenceState = 0;
       Serial.println("🔑 Sequência cancelada por timeout.");
@@ -672,76 +725,94 @@ void checkButtons()
   for (int i = 0; i < numBits; i++)
   {
     int buttonNumber = mapButton(i);
-    
+
     // Processa apenas na borda de subida (Press Down)
     if (bitRead(currentButtonStates, i) && !bitRead(lastButtonStates, i))
     {
-      if (inSettingsMenu) {
-         handleButtonPress(buttonNumber); 
-      } else if (!inSettingsMenu) {
-         
-         // 1. Envia a informação normal (ação do botão)
-         handleButtonPress(buttonNumber); 
-         
-         // 2. Tenta acionar a Sequência 1-2-3 (SEM BLOQUEAR)
-         
-         // Verifica se a sequência atual é o botão correto
-         if (buttonNumber == SEQUENCE_TARGET[sequenceState]) {
-            
-            // Verifica se o tempo expirou
-            if (sequenceState > 0 && millis() - sequenceTimer > SEQUENCE_TIMEOUT_MS) {
-                 sequenceState = 0; // Se expirou, reseta.
-                 Serial.println("🔑 Sequência falhou por tempo.");
+      if (inSettingsMenu)
+      {
+        handleButtonPress(buttonNumber);
+      }
+      else if (!inSettingsMenu)
+      {
+
+        // 1. Envia a informação normal (ação do botão)
+        handleButtonPress(buttonNumber);
+
+        // 2. Tenta acionar a Sequência 1-2-3 (SEM BLOQUEAR)
+
+        // Verifica se a sequência atual é o botão correto
+        if (buttonNumber == SEQUENCE_TARGET[sequenceState])
+        {
+
+          // Verifica se o tempo expirou
+          if (sequenceState > 0 && millis() - sequenceTimer > SEQUENCE_TIMEOUT_MS)
+          {
+            sequenceState = 0; // Se expirou, reseta.
+            Serial.println("🔑 Sequência falhou por tempo.");
+          }
+
+          // Tenta avançar o estado da sequência
+          if (buttonNumber == SEQUENCE_TARGET[sequenceState])
+          {
+            sequenceState++;
+            if (sequenceState == 1)
+            {
+              // Inicia o timer no primeiro clique
+              sequenceTimer = millis();
+              drawStatusMessage("Sequencia: Pressione 2...");
             }
-            
-            // Tenta avançar o estado da sequência
-            if (buttonNumber == SEQUENCE_TARGET[sequenceState]) {
-                sequenceState++;
-                if (sequenceState == 1) {
-                    // Inicia o timer no primeiro clique
-                    sequenceTimer = millis();
-                    drawStatusMessage("Sequencia: Pressione 2...");
-                } else if (sequenceState < SEQUENCE_LENGTH) {
-                    // Continua a sequência 
-                    drawStatusMessage(String("Sequencia: Pressione ") + String(SEQUENCE_TARGET[sequenceState]) + "...");
-                }
-                
-                if (sequenceState == SEQUENCE_LENGTH) {
-                    // Sequência Completa (1-2-3)
-                    sequenceState = 0; 
-                    inSettingsMenu = true;
-                    drawSettingsPanel(); 
-                    drawStatusMessage("MENU: Configuracoes Abertas.");
-                }
+            else if (sequenceState < SEQUENCE_LENGTH)
+            {
+              // Continua a sequência
+              drawStatusMessage(String("Sequencia: Pressione ") + String(SEQUENCE_TARGET[sequenceState]) + "...");
             }
-         } else {
-             // Botão errado (se estava no meio da sequência)
-             if (sequenceState > 0) {
-                 sequenceState = 0;
-                 Serial.println("🔑 Sequência incorreta. Reset.");
-                 drawStatusMessage("Sequencia incorreta. Reset.");
-             }
-         }
+
+            if (sequenceState == SEQUENCE_LENGTH)
+            {
+              // Sequência Completa (1-2-3)
+              sequenceState = 0;
+              inSettingsMenu = true;
+              drawSettingsPanel();
+              drawStatusMessage("MENU: Configuracoes Abertas.");
+            }
+          }
+        }
+        else
+        {
+          // Botão errado (se estava no meio da sequência)
+          if (sequenceState > 0)
+          {
+            sequenceState = 0;
+            Serial.println("🔑 Sequência incorreta. Reset.");
+            drawStatusMessage("Sequencia incorreta. Reset.");
+          }
+        }
       }
     }
   }
   lastButtonStates = currentButtonStates;
 }
 
-
 void handleButtonPress(int buttonNumber)
 {
   // =================================================================
   // === LÓGICA DO MENU DE CONFIGURAÇÕES (Ação de clique rápido) =====
   // =================================================================
-  if (inSettingsMenu) {
-    if (buttonNumber == 1) { 
-      resetWiFiCredentials(); 
-    } else if (buttonNumber == 2) { 
+  if (inSettingsMenu)
+  {
+    if (buttonNumber == 1)
+    {
+      resetWiFiCredentials();
+    }
+    else if (buttonNumber == 2)
+    {
       inSettingsMenu = false;
-      drawMainInterface(); 
+      drawMainInterface();
       drawStatusMessage("Menu Fechado");
-    } else {
+    }
+    else
+    {
       drawStatusMessage("Pressione BTN 1 ou 2");
     }
     return;
@@ -750,12 +821,12 @@ void handleButtonPress(int buttonNumber)
   // =================================================================
   // === LÓGICA DE ENVIO DE COMANDO (TELA PRINCIPAL) ==================
   // =================================================================
-  
+
   String command = "BTN:" + String(buttonNumber);
-  
+
   if (activeProtocol == USB) // PRIO 1: USB
   {
-    Serial.println(command); 
+    Serial.println(command);
     drawStatusMessage("Botao " + String(buttonNumber) + " enviado (USB)");
   }
   else if (activeProtocol == WIFI) // PRIO 2: WI-FI
@@ -769,7 +840,7 @@ void handleButtonPress(int buttonNumber)
   }
 
   delay(300);
-  
+
   if (activeProtocol == NONE)
   {
     drawStatusMessage("Aguardando conexao...");
@@ -782,19 +853,23 @@ void handleButtonPress(int buttonNumber)
 
 void checkConnectionChange()
 {
-    bool currentOverallConnection = (activeProtocol != NONE);
+  bool currentOverallConnection = (activeProtocol != NONE);
 
-    if (inSettingsMenu) {
-        // CORREÇÃO DEFINITIVA FLICKER: Se estiver no menu, RETORNA, sem redesenho.
-        return; 
-    } else {
-        if (currentOverallConnection != lastOverallConnectionStatus) {
-            updateConnectionStatus(activeProtocol);
-            drawMainInterface(); 
-        }
+  if (inSettingsMenu)
+  {
+    // Se estiver no menu, RETORNA.
+    return;
+  }
+  else
+  {
+    if (currentOverallConnection != lastOverallConnectionStatus)
+    {
+      updateConnectionStatus(activeProtocol);
+      drawMainInterface();
     }
+  }
 
-    lastOverallConnectionStatus = currentOverallConnection;
+  lastOverallConnectionStatus = currentOverallConnection;
 }
 
 // =========================================================================
@@ -804,25 +879,27 @@ void checkConnectionChange()
 void setup()
 {
   Serial.begin(115200);
-  preferences.begin(PREFS_KEY, false);
+  preferences.begin(PREFS_KEY, false); // Inicia o namespace de preferências no setup
 
   initializeDisplay();
   initButtons();
-  
+
   drawBootScreen();
   delay(2500);
 
   initWiFi();
-  
+
   // Só tenta iniciar TCP e UDP se o Wi-Fi se conectou
-  if (WiFi.status() == WL_CONNECTED) {
-    serverTCP.begin(); 
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    serverTCP.begin();
     Serial.print("Servidor TCP iniciado na porta: ");
     Serial.println(TCP_PORT);
-    
+
     Udp.begin(UDP_SEARCH_PORT);
     Serial.print("Escutando UDP na porta: ");
     Serial.println(UDP_SEARCH_PORT);
+    // activeProtocol = WIFI; // REMOVIDO: Só deve ser setado quando o cliente TCP se conecta
   }
 
   drawMainInterface();
@@ -833,12 +910,13 @@ void setup()
 void loop()
 {
   // A verificação de timeout da sequência
-  if (!wifiConfigMode && sequenceState > 0 && millis() - sequenceTimer > SEQUENCE_TIMEOUT_MS) {
-      sequenceState = 0;
-      Serial.println("🔑 Sequência cancelada por timeout no Loop.");
-      drawStatusMessage("Sequencia 1-2-3 cancelada.");
+  if (!wifiConfigMode && sequenceState > 0 && millis() - sequenceTimer > SEQUENCE_TIMEOUT_MS)
+  {
+    sequenceState = 0;
+    Serial.println("🔑 Sequência cancelada por timeout no Loop.");
+    drawStatusMessage("Sequencia 1-2-3 cancelada.");
   }
-  
+
   if (wifiConfigMode)
   {
     dnsServer.processNextRequest();
@@ -846,39 +924,66 @@ void loop()
   }
   else
   {
-    checkButtons();
-    checkSerialCommands();
-    
     if (WiFi.status() == WL_CONNECTED)
     {
-      checkUdpSearch(); 
-      
-        if (!client || !client.connected())
+      if (!wifiStatusHandled)
+      {
+        // A conexão Wi-Fi acabou de ser estabelecida!
+        Serial.println("🌐 Conexão Wi-Fi estabelecida. Atualizando interface.");
+        drawMainInterface(); // Redesenha para mostrar o IP e status de rede
+        drawStatusMessage(String("IP: ") + WiFi.localIP().toString());
+        wifiStatusHandled = true; // Marca como handled (tratado)
+      }
+    }
+    else
+    {
+      // Se a conexão cair, resetamos a flag para que a próxima conexão dispare a atualização
+      wifiStatusHandled = false;
+    }
+    // =========================================================
+
+    checkButtons();
+    checkSerialCommands();
+
+    if (WiFi.status() == WL_CONNECTED)
+    {
+      checkUdpSearch();
+
+      if (!client || !client.connected())
+      {
+        WiFiClient newClient = serverTCP.available();
+        if (newClient)
         {
-            WiFiClient newClient = serverTCP.available();
-            if (newClient)
+          if (client)
+            client.stop();
+          client = newClient;
+          Serial.println("🌐 Cliente Python conectado via Wi-Fi!");
+          if (activeProtocol != USB)
+          {
+            activeProtocol = WIFI; // SÓ SETA WIFI QUANDO O CLIENTE TCP CONECTA
+          }
+        }
+      }
+
+      if (client.connected())
+      {
+        while (client.available())
+        {
+          String msg = client.readStringUntil('\n');
+          msg.trim();
+          if (msg == "PING")
+            client.println("PONG");
+          if (msg == "DISCONNECT")
+          {
+            client.stop();
+            Serial.println("🌐 Cliente Wi-Fi desconectado.");
+            if (activeProtocol == WIFI)
             {
-                if (client) client.stop();
-                client = newClient;
-                Serial.println("🌐 Cliente Python conectado via Wi-Fi!");
-                if (activeProtocol != USB) { 
-                    activeProtocol = WIFI; 
-                }
+              activeProtocol = NONE;
             }
+          }
         }
-        
-        if (client.connected()) {
-            while (client.available()) {
-                String msg = client.readStringUntil('\n');
-                msg.trim();
-                if (msg == "PING") client.println("PONG");
-                if (msg == "DISCONNECT") {
-                   client.stop();
-                   Serial.println("🌐 Cliente Wi-Fi desconectado.");
-                   if (activeProtocol == WIFI) { activeProtocol = NONE; }
-                }
-            }
-        }
+      }
     }
 
     checkConnectionChange();
