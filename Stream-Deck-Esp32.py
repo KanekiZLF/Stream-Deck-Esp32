@@ -163,11 +163,11 @@ class Logger:
         should_save = False
         if level == "ERROR":
             should_save = True
-        elif "Fechando aplicação" in msg or "Porta serial fechada" in msg or "Conexão Wi-Fi fechada" in msg:
+        elif "Fechando aplicação" in msg or "USB Desconectado" in msg or "Wi-Fi Desconectado" in msg:
             should_save = True
         
         # Otimização: Apenas salva log crítico e informações de sessão/serial
-        if should_save or level == "ERROR" or "Fechando aplicação" in msg or "Porta serial fechada" in msg or "Conexão Wi-Fi fechada" in msg:
+        if should_save or level == "ERROR" or "Fechando aplicação" in msg or "USB Desconectado" in msg or "Wi-Fi Desconectado" in msg:
             self._write_file(entry)
             
         if self.textbox:
@@ -1471,7 +1471,6 @@ class SerialManager:
             self._running = False
             self._is_connected = False
             if self.on_status_change: self.on_status_change(False, self.connection_type)
-            self.logger.warn("Loop de leitura serial interrompido.")
 
 # -----------------------------
 # Wifi Manager
@@ -3201,7 +3200,17 @@ class Esp32DeckApp(ctk.CTk):
         if 'buttons' not in self.config.data:
             self.config.data['buttons'] = self.config._default()['buttons']
             self.config.save()
-            
+
+        if button_key not in self.config.data['buttons']:
+            default_conf = self.config._default()['buttons'].get(button_key, {
+                "label": "",
+                "icon": "",
+                "led_color": "#FFFFFF", 
+                "action": {"type": "none", "payload": ""}
+            })
+            self.config.data['buttons'][button_key] = default_conf
+            self.config.save()
+
         conf = self.config.data['buttons'][button_key]
 
         dlg = ButtonConfigDialog(self, button_key, conf.copy(), self.icon_loader, self.logger) 
