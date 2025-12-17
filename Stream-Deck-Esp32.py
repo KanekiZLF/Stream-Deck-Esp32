@@ -28,9 +28,8 @@ except ImportError:
 # GUI libs
 import customtkinter as ctk
 import tkinter as tk
-from tkinter import filedialog, simpledialog, colorchooser 
-# REMOVIDO: from tkinter import messagebox (substituído por CTkMessageDialog)
-from PIL import Image, ImageTk, ImageDraw
+from tkinter import filedialog, colorchooser 
+from PIL import Image, ImageDraw
 
 # Serial
 import serial
@@ -71,7 +70,7 @@ except ImportError:
 CONFIG_FILE = "Esp32_deck_config.json"
 ICON_FOLDER = "icons"
 LOG_FILE = "Esp32_deck.log"
-APP_VERSION = "3.2.0" # Versão atualizada
+APP_VERSION = "3.2.0"
 APP_NAME = "Esp32 Deck Controller"
 APP_ICON_NAME = "app_icon.ico"
 DEVELOPER = "Luiz F. R. Pimentel"
@@ -168,7 +167,7 @@ class Logger:
         elif "Fechando aplicação" in msg or "USB Desconectado" in msg or "Wi-Fi Desconectado" in msg:
             should_save = True
         
-        # Otimização: Apenas salva log crítico e informações de sessão/serial
+        # Apenas salva log crítico e informações de sessão/serial
         if should_save or level == "ERROR" or "Fechando aplicação" in msg or "USB Desconectado" in msg or "Wi-Fi Desconectado" in msg:
             self._write_file(entry)
             
@@ -214,16 +213,16 @@ class ConfigManager:
             "version": APP_VERSION,
             "buttons": buttons,
             "serial": {
-                "type": "Serial", # NOVO: Tipo de conexão padrão
+                "type": "Serial",
                 "port": "", 
                 "baud": DEFAULT_SERIAL_BAUD
             },
-            "wifi": { # NOVO: Configurações de Wi-Fi
+            "wifi": {
                 "ip": "192.168.1.100", 
                 "port": 8000
             },
             "appearance": {
-                "theme": "System", 
+                "theme": "Dark", 
                 "icon_size": ICON_SIZE[0],
                 "minimize_to_tray": False,
                 "font_size": "Médio",
@@ -1166,7 +1165,7 @@ class ButtonConfigDialog(ctk.CTkToplevel):
         self.logger = logger
         self._newly_created_icon = None
         self.title(f'Configurar Botão {button_key}')
-        self.geometry('550x580') # Aumentado para acomodar o menu de ação
+        self.geometry('550x580')
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
@@ -1200,7 +1199,6 @@ class ButtonConfigDialog(ctk.CTkToplevel):
         def on_name_change(*args):
             if len(self.label_var.get()) > 16: self.label_var.set(self.label_var.get()[:16])
         self.label_var.trace('w', on_name_change)
-        # MODIFICAÇÃO: Adiciona um placeholder mais útil
         ctk.CTkEntry(main_frame, textvariable=self.label_var, width=400, placeholder_text="Deixe vazio para mostrar apenas o ícone").pack(fill='x', pady=5, padx=5)
         
         # Ícone e Programa (Frame)
@@ -1492,7 +1490,6 @@ class ButtonConfigDialog(ctk.CTkToplevel):
             
         except Exception as e:
             self.parent.logger.error(f"❌ Erro durante exclusão: {e}\n{traceback.format_exc()}")
-            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showerror
             CTkMessageDialog.showerror(self, "Erro", f"Ocorreu um erro durante a exclusão: {e}", self.logger)
                 
     def _save_and_close(self):
@@ -1582,8 +1579,6 @@ class SerialManager:
         self._running = False
         self._is_connected = False
         self.connection_type = "Serial"
-        # O self.connection_type não será alterado, pois ele define a lógica interna
-        # se é serial (COM) ou Wi-Fi. A mudança para 'USB' é apenas cosmética na UI.
 
     @property
     def is_connected(self):
@@ -1684,7 +1679,7 @@ class WifiManager:
         return self._is_connected
 
     def send_command(self, command: str) -> bool:
-        # CORREÇÃO: Verifica se o socket existe E se ainda está conectado (flag)
+        # Verifica se o socket existe E se ainda está conectado (flag)
         if self._is_connected and self._socket:
             try:
                 self._socket.sendall((command + "\n").encode('utf-8'))
@@ -1739,8 +1734,6 @@ class WifiManager:
             except Exception: pass
             
             try:
-                # CORREÇÃO: Fechar o socket aqui fará com que o select na thread falhe,
-                # permitindo que a thread termine naturalmente.
                 self._socket.shutdown(socket.SHUT_RDWR)
                 self._socket.close()
                 self.logger.info('🔌 Conexão Wi-Fi fechada')
@@ -1753,7 +1746,6 @@ class WifiManager:
 
     def _reader_loop(self):
         try:
-            # CORREÇÃO: Loop verifica self._running e self._socket
             while self._running and self._socket:
                 try:
                     # Usa 'select' para non-blocking read
@@ -2287,7 +2279,6 @@ class Esp32DeckApp(ctk.CTk):
         self.logger.info(f"Minimizar para Tray {status}")
 
     def _reset_appearance(self):
-        # SUBSTITUIÇÃO: Usando CTkMessageDialog.askyesno
         if CTkMessageDialog.askyesno(self, "Confirmar Reset", "Restaurar padrões de aparência?", self.logger):
             self.config.data['appearance'] = {'theme': 'System', 'transparency': 1.0, 'color_scheme': 'Padrão', 'font_size': 'Médio', 'minimize_to_tray': False}
             
@@ -2305,7 +2296,6 @@ class Esp32DeckApp(ctk.CTk):
             self._on_font_size_change('Médio')
             
             self.config.save()
-            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showinfo
             CTkMessageDialog.showinfo(self, "Reset", "Configurações restauradas!", self.logger)
     
     def _build_ui(self):
@@ -2371,7 +2361,6 @@ class Esp32DeckApp(ctk.CTk):
 
         status_color = self.colors["success"] if connected else self.colors["danger"]
         
-        # Usa 'USB' no lugar de 'Serial' apenas na interface visual
         visual_connection_type = "USB" if connection_type == "Serial" else connection_type
         status_text = f"Conectado ({visual_connection_type})" if connected else "Desconectado"
         
@@ -2409,7 +2398,7 @@ class Esp32DeckApp(ctk.CTk):
                 self.port_entry.configure(state='disabled')
                 self.search_btn.configure(state='disabled')
 
-                if conn_type_ui == 'USB': # Usa a string atualizada para o check
+                if conn_type_ui == 'USB':
                     self.port_option.configure(state='normal')
                     self.baud_option.configure(state='normal')
                     self.refresh_ports_btn.configure(state='normal')
@@ -2419,7 +2408,7 @@ class Esp32DeckApp(ctk.CTk):
                     self.search_btn.configure(state='normal')
 
 
-        # --- Status Card Detalhes (NOVA LÓGICA) ---
+        # --- Status Card Detalhes ---
         
         # Garante que os widgets do novo Status Card existam
         if not self.dash_icon or not self.status_card or not self.connection_details_textbox:
@@ -2732,7 +2721,6 @@ class Esp32DeckApp(ctk.CTk):
         
         if not is_serial and not is_wifi:
             self.logger.warn("❌ Não conectado: Conecte ao USB ou Wi-Fi para enviar comandos de LED.")
-            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showwarning
             CTkMessageDialog.showwarning(self, "Aviso", "Não é possível enviar comandos de LED. Conecte primeiro.", self.logger)
             return
 
@@ -2760,7 +2748,6 @@ class Esp32DeckApp(ctk.CTk):
         
         if not is_serial and not is_wifi:
             self.logger.warn("❌ Não conectado: Conecte à porta serial ou Wi-Fi para enviar comandos de LED.")
-            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showwarning
             CTkMessageDialog.showwarning(self, "Aviso", "Não é possível enviar comandos de LED. Conecte primeiro.", self.logger)
             return
 
@@ -2782,27 +2769,22 @@ class Esp32DeckApp(ctk.CTk):
     def _backup_config(self): 
         try:
             path = self.config.backup()
-            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showinfo
             CTkMessageDialog.showinfo(self, "Backup", f"Configuração salva em:\n{path}", self.logger)
         except RuntimeError:
             pass # Cancelado
         except Exception as e:
-            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showerror
             CTkMessageDialog.showerror(self, "Erro", f"Falha ao salvar backup: {e}", self.logger)
 
     def _restore_config(self):
-        # SUBSTITUIÇÃO: Usando CTkMessageDialog.askyesno
         if not CTkMessageDialog.askyesno(self, "Restaurar Configuração", "Isto substituirá a configuração atual. Continuar?", self.logger):
             return
         try:
             path = self.config.restore()
             self.refresh_all()
-            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showinfo
             CTkMessageDialog.showinfo(self, "Restauração", f"Configuração carregada de:\n{path}", self.logger)
         except RuntimeError:
             pass # Cancelado
         except Exception as e:
-            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showerror
             CTkMessageDialog.showerror(self, "Erro", f"Falha ao restaurar: {e}", self.logger)
 
     def _build_connection_status_card(self, parent):
@@ -3086,7 +3068,6 @@ class Esp32DeckApp(ctk.CTk):
             port = int(self.port_entry.get().strip())
         except ValueError:
             self.logger.error("Porta inválida.")
-            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showerror
             CTkMessageDialog.showerror(self, "Erro", "A porta deve ser um número válido (Ex: 8000).", self.logger)
             return
 
@@ -3120,12 +3101,10 @@ class Esp32DeckApp(ctk.CTk):
             self.ip_entry.delete(0, 'end')
             self.ip_entry.insert(0, ip)
             self.logger.info(f"Dispositivo Wi-Fi encontrado em: {ip}")
-            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showinfo
             CTkMessageDialog.showinfo(self, "Sucesso", f"Dispositivo encontrado em: {ip}", self.logger)
         else:
             self.logger.warn("Dispositivo Wi-Fi não encontrado.")
-            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showwarning
-            CTkMessageDialog.showwarning(self, "Aviso", "Dispositivo não encontrado. Verifique o Wi-Fi do ESP32.", self.logger)
+            CTkMessageDialog.showwarning(self, "Aviso", "Dispositivo não encontrado. Verifique o Wi-Fi do ESP32 Deck.", self.logger)
 
     def update_serial_ports(self):
         ports = self.serial_manager.list_ports() or ['Nenhuma']
@@ -3146,10 +3125,8 @@ class Esp32DeckApp(ctk.CTk):
         
     def _save_all(self):
         if self.config.save(): 
-            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showinfo
             CTkMessageDialog.showinfo(self, "Sucesso", "Configurações salvas!", self.logger)
         else: 
-            # SUBSTITUIÇÃO: Usando CTkMessageDialog.showerror
             CTkMessageDialog.showerror(self, "Erro", "Erro ao salvar!", self.logger)
             
     def _show_about(self): AboutDialog(self)
