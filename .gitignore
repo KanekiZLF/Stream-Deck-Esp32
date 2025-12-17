@@ -4,6 +4,9 @@
 # Outras pastas e arquivos comuns a serem ignorados
 config.json
 Esp32_deck.log*
+Esp32_deck.log
+Esp32_deck_config.json
+utils/
 token.txt
 icons/
 
