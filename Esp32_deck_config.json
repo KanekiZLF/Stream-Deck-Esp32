@@ -1,82 +1,167 @@
 {
-    "version": "1.5.17",
+    "version": "3.2.0",
     "buttons": {
         "1": {
-            "label": "Botão 1",
+            "label": "",
             "icon": "",
+            "led_color": "#FFFFFF",
             "action": {
                 "type": "none",
                 "payload": ""
             }
         },
         "2": {
-            "label": "Botão 2",
+            "label": "",
             "icon": "",
+            "led_color": "#FFFFFF",
             "action": {
                 "type": "none",
                 "payload": ""
             }
         },
         "3": {
-            "label": "Botão 3",
+            "label": "",
             "icon": "",
+            "led_color": "#FFFFFF",
             "action": {
                 "type": "none",
                 "payload": ""
             }
         },
         "4": {
-            "label": "Botão 4",
+            "label": "",
             "icon": "",
+            "led_color": "#FFFFFF",
             "action": {
-                "type": "open_program",
+                "type": "none",
                 "payload": ""
             }
         },
         "5": {
-            "label": "Botão 5",
+            "label": "",
             "icon": "",
+            "led_color": "#FFFFFF",
             "action": {
-                "type": "open_program",
+                "type": "none",
                 "payload": ""
             }
         },
         "6": {
-            "label": "Botão 6",
+            "label": "",
             "icon": "",
+            "led_color": "#FFFFFF",
             "action": {
-                "type": "open_program",
+                "type": "none",
                 "payload": ""
             }
         },
         "7": {
-            "label": "Botão 7",
+            "label": "",
             "icon": "",
+            "led_color": "#FFFFFF",
             "action": {
-                "type": "open_program",
+                "type": "none",
                 "payload": ""
             }
         },
         "8": {
-            "label": "Botão 8",
+            "label": "",
             "icon": "",
+            "led_color": "#FFFFFF",
             "action": {
-                "type": "open_program",
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "9": {
+            "label": "",
+            "icon": "",
+            "led_color": "#FFFFFF",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "10": {
+            "label": "",
+            "icon": "",
+            "led_color": "#FFFFFF",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "11": {
+            "label": "",
+            "icon": "",
+            "led_color": "#FFFFFF",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "12": {
+            "label": "",
+            "icon": "",
+            "led_color": "#FFFFFF",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "13": {
+            "label": "",
+            "icon": "",
+            "led_color": "#FFFFFF",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "14": {
+            "label": "",
+            "icon": "",
+            "led_color": "#FFFFFF",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "15": {
+            "label": "",
+            "icon": "",
+            "led_color": "#FFFFFF",
+            "action": {
+                "type": "none",
+                "payload": ""
+            }
+        },
+        "16": {
+            "label": "",
+            "icon": "",
+            "led_color": "#FFFFFF",
+            "action": {
+                "type": "none",
                 "payload": ""
             }
         }
     },
     "serial": {
-        "port": "COM3",
+        "type": "Serial",
+        "port": "",
         "baud": 115200
+    },
+    "wifi": {
+        "ip": "192.168.1.100",
+        "port": 8000
     },
     "appearance": {
         "theme": "Dark",
-        "transparency": 1.0,
-        "color_scheme": "Moderno",
-        "font_size": "Médio",
+        "icon_size": 80,
         "minimize_to_tray": false,
-        "icon_size": 64
+        "font_size": "Médio",
+        "color_scheme": "Moderno",
+        "transparency": 1.0
     },
     "update": {
         "check_url": "https://raw.githubusercontent.com/KanekiZLF/Stream-Deck-Esp32/refs/heads/main/version.txt"
