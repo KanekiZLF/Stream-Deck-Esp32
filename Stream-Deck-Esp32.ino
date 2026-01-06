@@ -2,15 +2,18 @@
 // === ESP32 DECK FÍSICO - MÚLTIPLAS INTERFACES ======================================
 // ===================================================================================
 
+#include <FS.h>
 #include <TFT_eSPI.h>
 #include <SPI.h>
 #include <WiFi.h>
 #include <WebServer.h>
 #include <DNSServer.h>
 #include <Preferences.h>
-#include <FS.h>
 #include <SPIFFS.h>
 #include <WiFiUdp.h>
+#include <FastLED.h>
+
+using fs::FS;
 
 // =========================================================================
 // === CONFIGURAÇÕES GERAIS E WI-FI ========================================
@@ -38,6 +41,22 @@ const int dataPin = 17;
 const int clockPin = 21;
 const int latchPin = 22;
 const int numBits = 8;
+
+// =========================================================================
+// === CONFIGURAÇÕES DOS LEDs WS2812B (usando WS2812B que é compatível) ====
+// =========================================================================
+#define LED_PIN 12        // Pino de dados dos LEDs WS2812B
+#define NUM_LEDS 16       // Quantidade de LEDs na sua fita
+#define LED_BRIGHTNESS 50 // Brilho (0-255)
+
+#define PIN_BATT_ADC 33    // Pino para ler o divisor de tensão (ADC1_CH6)
+#define PIN_TP4056_CE 13    // Conectado ao pino CE do TP4056 (através de um transistor se necessário)
+
+float batteryVoltage = 0.0;
+int batteryPercentage = 0;
+bool isUsbConnected = false;
+
+CRGB leds[NUM_LEDS];     // Array para controlar os LEDs
 
 // =========================================================================
 // === CONFIGURAÇÕES DO DISPLAY ============================================
@@ -73,6 +92,13 @@ bool wifiStatusHandled = false;
 int sequenceState = 0;
 unsigned long sequenceTimer = 0;
 
+// Variáveis para controle dos LEDs - SIMPLIFICADO
+unsigned long lastStatusUpdate = 0;
+bool effectActive = false;
+String currentEffect = "";
+unsigned long effectTimer = 0;
+bool manualControl = false; // Nova flag: quando true, updateLEDs() não faz nada
+
 // =========================================================================
 // === CONFIGURAÇÃO DE CORES ===============================================
 // =========================================================================
@@ -92,6 +118,14 @@ unsigned long sequenceTimer = 0;
 // =========================================================================
 void initializeDisplay();
 void initButtons();
+void initLEDs();
+void updateLEDs();
+void processLedCommand(const String& command);
+void processIndividualLedCommand(const String& command);
+void processAllLedCommand(const String& command);
+void updateEffect();
+void setStatusLEDs(); // Nova função apenas para status
+void clearAllLEDs(); // Nova função
 void drawBootScreen();
 void drawMainInterface();
 void drawSettingsPanel();
@@ -125,6 +159,268 @@ void drawPanelClassic();
 // === IMPLEMENTAÇÕES DE FUNÇÕES ===========================================
 // =========================================================================
 
+void initLEDs() {
+  // WS2812B é compatível com WS2812B, então usamos WS2812B
+  FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
+  FastLED.setBrightness(LED_BRIGHTNESS);
+  
+  // Inicializa todos os LEDs apagados
+  clearAllLEDs();
+  
+  Serial.println("✅ LEDs WS2812B inicializados no pino 2 (usando driver WS2812B)");
+}
+
+void clearAllLEDs() {
+  for(int i = 0; i < NUM_LEDS; i++) {
+    leds[i] = CRGB::Black;
+  }
+  FastLED.show();
+}
+
+void setStatusLEDs() {
+  // Esta função SÓ é chamada para mostrar status de conexão
+  // Não interfere com controle manual ou efeitos
+  
+  if (wifiConfigMode) {
+    // Modo configuração: piscando azul
+    static unsigned long lastBlink = 0;
+    static bool blinkState = false;
+    
+    if (millis() - lastBlink > 300) {
+      blinkState = !blinkState;
+      CRGB color = blinkState ? CRGB::Blue : CRGB::Black;
+      fill_solid(leds, NUM_LEDS, color);
+      FastLED.show();
+      lastBlink = millis();
+    }
+    return;
+  }
+  
+  if (activeProtocol == USB) {
+    // Conectado USB: Azul sólido
+    fill_solid(leds, NUM_LEDS, CRGB::Blue);
+    FastLED.show();
+  }
+  else if (activeProtocol == WIFI) {
+    // Conectado Wi-Fi: Verde sólido
+    fill_solid(leds, NUM_LEDS, CRGB::Green);
+    FastLED.show();
+  }
+  else {
+    // Desconectado: Vermelho piscando
+    static unsigned long lastBlink = 0;
+    static bool blinkState = false;
+    
+    if (millis() - lastBlink > 500) {
+      blinkState = !blinkState;
+      CRGB color = blinkState ? CRGB::Red : CRGB::Black;
+      fill_solid(leds, NUM_LEDS, color);
+      FastLED.show();
+      lastBlink = millis();
+    }
+  }
+}
+
+void updateLEDs() {
+  // Esta função agora é SIMPLES:
+  // 1. Se temos controle manual ou efeito ativo, NÃO FAZ NADA
+  // 2. Caso contrário, mostra o status normal
+  
+  if (manualControl || effectActive) {
+    return; // Não interfere com controle manual ou efeitos
+  }
+  
+  // Só atualiza status a cada 100ms para economizar processamento
+  if (millis() - lastStatusUpdate > 100) {
+    setStatusLEDs();
+    lastStatusUpdate = millis();
+  }
+}
+
+void processIndividualLedCommand(const String& command) {
+  // Formato: LED:<ID>:<RRGGBB>
+  manualControl = true; // Ativa controle manual
+  effectActive = false; // Desativa efeitos
+  
+  int firstColon = command.indexOf(':');
+  int secondColon = command.indexOf(':', firstColon + 1);
+  
+  if (secondColon != -1) {
+    int ledIndex = command.substring(firstColon + 1, secondColon).toInt();
+    String colorStr = command.substring(secondColon + 1);
+    
+    // Remove o # se existir
+    if (colorStr.startsWith("#")) {
+      colorStr = colorStr.substring(1);
+    }
+    
+    // Converter hex para CRGB
+    long color = strtol(colorStr.c_str(), NULL, 16);
+    CRGB ledColor = CRGB(
+      (color >> 16) & 0xFF,
+      (color >> 8) & 0xFF,
+      color & 0xFF
+    );
+    
+    if (ledIndex >= 0 && ledIndex < NUM_LEDS) {
+      leds[ledIndex] = ledColor;
+      FastLED.show();
+      
+      Serial.print("✅ LED ");
+      Serial.print(ledIndex);
+      Serial.print(" definido para cor: #");
+      Serial.println(colorStr);
+    } else {
+      Serial.print("❌ Índice LED inválido: ");
+      Serial.println(ledIndex);
+    }
+  }
+}
+
+void updateEffect() {
+  if (!effectActive) return;
+  
+  // Para efeitos lentos, atualiza a cada 50ms
+  if (millis() - effectTimer < 50) return;
+  
+  if (currentEffect == "RAINBOW") {
+    // Efeito arco-íris
+    static uint8_t hue = 0;
+    fill_rainbow(leds, NUM_LEDS, hue, 255 / NUM_LEDS);
+    FastLED.show();
+    hue += 5;
+  }
+  else if (currentEffect == "BLINK") {
+    // Efeito piscante
+    static bool blinkState = false;
+    blinkState = !blinkState;
+    CRGB color = blinkState ? CRGB::White : CRGB::Black;
+    fill_solid(leds, NUM_LEDS, color);
+    FastLED.show();
+  }
+  else if (currentEffect == "WAVE_BLUE") {
+    // Onda azul
+    static uint8_t offset = 0;
+    for(int i = 0; i < NUM_LEDS; i++) {
+      uint8_t brightness = sin8(i * 32 + offset);
+      leds[i] = CRGB(0, 0, brightness);
+    }
+    FastLED.show();
+    offset += 8;
+  }
+  else if (currentEffect == "FIRE") {
+    // Efeito fogo
+    for(int i = 0; i < NUM_LEDS; i++) {
+      int heat = random8(50, 255);
+      leds[i] = HeatColor(heat);
+    }
+    FastLED.show();
+  }
+  else if (currentEffect == "GRADIENT") {
+    // Gradiente de cores
+    static uint8_t hue = 0;
+    fill_gradient_RGB(leds, NUM_LEDS, 
+                     CHSV(hue, 255, 255), 
+                     CHSV(hue + 128, 255, 255));
+    FastLED.show();
+    hue += 1;
+  }
+  else if (currentEffect == "TWINKLE") {
+    // Estrelas piscando
+    static uint8_t sparkle[NUM_LEDS];
+    for(int i = 0; i < NUM_LEDS; i++) {
+      if(sparkle[i] == 0 && random8() < 10) {
+        sparkle[i] = 255;
+      }
+      if(sparkle[i] > 0) {
+        sparkle[i] = qsub8(sparkle[i], 15);
+        leds[i] = CRGB(sparkle[i], sparkle[i], sparkle[i]);
+      } else {
+        leds[i] = CRGB::Black;
+      }
+    }
+    FastLED.show();
+  }
+  else if (currentEffect == "ALERT") {
+    // Alerta vermelho piscante
+    static bool alertState = false;
+    alertState = !alertState;
+    CRGB color = alertState ? CRGB::Red : CRGB::Black;
+    fill_solid(leds, NUM_LEDS, color);
+    FastLED.show();
+  }
+  
+  effectTimer = millis();
+}
+
+void processAllLedCommand(const String& command) {
+  String subCmd = command.substring(8);
+  manualControl = true; // Ativa controle manual
+  
+  if (subCmd == "ON") {
+    // Liga todos os LEDs (branco)
+    fill_solid(leds, NUM_LEDS, CRGB::White);
+    FastLED.show();
+    effectActive = false;
+    Serial.println("✅ Todos LEDs LIGADOS (branco)");
+  }
+  else if (subCmd == "OFF") {
+    // Desliga todos os LEDs
+    clearAllLEDs();
+    effectActive = false;
+    Serial.println("✅ Todos LEDs DESLIGADOS");
+  }
+  else {
+    // É um efeito contínuo
+    effectActive = true;
+    currentEffect = subCmd;
+    effectTimer = millis();
+    
+    if (subCmd == "RAINBOW") {
+      Serial.println("✅ Efeito ARCO-ÍRIS ativado");
+    }
+    else if (subCmd == "BLINK") {
+      Serial.println("✅ Efeito PISCANTE ativado");
+    }
+    else if (subCmd == "WAVE_BLUE") {
+      Serial.println("✅ Efeito ONDA AZUL ativado");
+    }
+    else if (subCmd == "FIRE") {
+      Serial.println("✅ Efeito FOGO ativado");
+    }
+    else if (subCmd == "GRADIENT") {
+      Serial.println("✅ Efeito GRADIENTE ativado");
+    }
+    else if (subCmd == "TWINKLE") {
+      Serial.println("✅ Efeito ESTRELAS ativado");
+    }
+    else if (subCmd == "ALERT") {
+      Serial.println("✅ Efeito ALERTA ativado");
+    }
+    else {
+      effectActive = false;
+      manualControl = false;
+      Serial.print("❌ Comando desconhecido: ");
+      Serial.println(subCmd);
+    }
+  }
+}
+
+void processLedCommand(const String& command) {
+  // Processa TODOS os comandos LED
+  
+  if (command.startsWith("LED:")) {
+    processIndividualLedCommand(command);
+  }
+  else if (command.startsWith("ALL_LED:")) {
+    processAllLedCommand(command);
+  }
+  else {
+    Serial.print("❌ Comando LED inválido: ");
+    Serial.println(command);
+  }
+}
+
 void checkUdpSearch()
 {
   if (WiFi.status() != WL_CONNECTED)
@@ -153,6 +449,15 @@ void checkUdpSearch()
         Udp.endPacket();
 
         Serial.println("ACK UDP enviado.");
+        
+        // Feedback visual nos LEDs
+        manualControl = true;
+        for(int i = 0; i < NUM_LEDS; i++) {
+          leds[i] = CRGB::Yellow;
+        }
+        FastLED.show();
+        delay(100);
+        manualControl = false;
       }
     }
   }
@@ -232,9 +537,13 @@ void checkSerialCommands()
     Serial.print("📨 Comando recebido: ");
     Serial.println(message);
 
-    if (message == "CONNECTED")
+    if (message.startsWith("LED:") || message.startsWith("ALL_LED:")) {
+      processLedCommand(message);
+    }
+    else if (message == "CONNECTED")
     {
       activeProtocol = USB;
+      manualControl = false; // Volta ao controle automático
       Serial.println("✅ Conexão estabelecida com software (USB)");
     }
     else if (message == "DISCONNECT")
@@ -248,10 +557,16 @@ void checkSerialCommands()
       {
         activeProtocol = NONE;
       }
+      manualControl = false; // Volta ao controle automático
     }
     else if (message == "PING")
     {
       Serial.println("PONG");
+    }
+    else if (message.startsWith("BTN:")) {
+      // Processa comandos de botão recebidos
+      Serial.print("Botão recebido via Serial: ");
+      Serial.println(message);
     }
   }
 }
@@ -333,12 +648,13 @@ void drawMainInterface()
   // ✅ ESCOLHA SUA INTERFACE PREFERIDA AQUI:
   // ⭐ DESCOMENTE APENAS UMA DAS LINHAS ABAIXO:
 
-  drawPanelCompact(); // ⭐ Opção 1 - Mais compacta
+  //drawPanelCompact(); // ⭐ Opção 1 - Mais compacta
   // drawPanelModern();    // ⭐ Opção 2 - Estilo moderno
   // drawPanelMinimal(); // ⭐ Opção 3 - Minimalista
   // drawPanelTechnical();  // ⭐ Opção 4 - Técnico
   // drawPanelGaming(); // ⭐ Opção 5 - Estilo gaming
   // drawPanelClassic(); // ⭐ Opção 6 - Clássico
+  drawPanelBatteryTest(); // Ative esta para o teste
 
   // Área de mensagens
   tft.drawFastHLine(10, 150, tft.width() - 20, TFT_DARKGREY);
@@ -410,9 +726,144 @@ void drawPanelMinimal()
   }
 }
 
-void drawPanelTechnical() void drawPanelGaming() void drawPanelClassic()
+void drawPanelTechnical() {
+  tft.setTextSize(1);
+  tft.setTextDatum(TL_DATUM);
+  
+  // Painel técnico com informações detalhadas
+  tft.fillRoundRect(10, 65, tft.width() - 20, 70, 5, TFT_DARKGREY);
+  tft.drawRoundRect(10, 65, tft.width() - 20, 70, 5, ACCENT_COLOR);
+  
+  tft.setTextColor(ACCENT_COLOR);
+  tft.drawString("SISTEMA TECNICO", 15, 70);
+  
+  tft.drawFastHLine(10, 82, tft.width() - 20, ACCENT_COLOR);
+  
+  tft.setTextColor(TFT_LIGHTGREY);
+  tft.drawString("ESP32 Deck v2.6", 15, 90);
+  tft.drawString("LEDs WS2812B: " + String(NUM_LEDS), 15, 102);
+  tft.drawString("Pino LEDs: " + String(LED_PIN), 90, 102);
+  tft.drawString("Shift Reg: " + String(numBits) + " bits", 15, 114);
+  
+  if (WiFi.isConnected()) {
+    tft.setTextColor(TFT_GREEN);
+    tft.drawString("Wi-Fi: " + WiFi.SSID(), 15, 126);
+    tft.setTextColor(TFT_YELLOW);
+    tft.drawString("IP: " + WiFi.localIP().toString(), 90, 126);
+  } else {
+    tft.setTextColor(TFT_RED);
+    tft.drawString("Wi-Fi: OFF", 15, 126);
+  }
+}
 
-    void startConfigPortal()
+void drawPanelGaming() {
+  tft.setTextSize(1);
+  tft.setTextDatum(TL_DATUM);
+  
+  // Estilo gaming
+  tft.fillRoundRect(10, 65, tft.width() - 20, 70, 5, TFT_NAVY);
+  tft.drawRoundRect(10, 65, tft.width() - 20, 70, 5, TFT_CYAN);
+  
+  tft.setTextColor(TFT_CYAN);
+  tft.drawString(">>> ESP32 DECK GAMING <<<", 15, 70);
+  
+  tft.setTextColor(TFT_WHITE);
+  tft.drawString("Status:", 15, 90);
+  tft.setTextColor(activeProtocol != NONE ? TFT_GREEN : TFT_RED);
+  tft.drawString(activeProtocol != NONE ? "ONLINE" : "OFFLINE", 60, 90);
+  
+  tft.setTextColor(TFT_YELLOW);
+  tft.drawString("LEDs: " + String(NUM_LEDS) + " RGB", 15, 102);
+  tft.drawString("Buttons: " + String(numBits), 15, 114);
+  
+  if (WiFi.isConnected()) {
+    tft.setTextColor(TFT_GREEN);
+    tft.drawString("Connected to:", 15, 126);
+    tft.drawString(WiFi.SSID().substring(0, 12), 90, 126);
+  } else {
+    tft.setTextColor(TFT_ORANGE);
+    tft.drawString("Gaming Mode", 15, 126);
+  }
+}
+
+void drawPanelClassic() {
+  tft.setTextSize(1);
+  tft.setTextDatum(TL_DATUM);
+  
+  // Estilo clássico minimalista
+  tft.drawRect(10, 65, tft.width() - 20, 70, TFT_WHITE);
+  
+  tft.setTextColor(TFT_WHITE);
+  tft.setTextDatum(TC_DATUM);
+  tft.drawString("ESP32 CONTROL PANEL", tft.width() / 2, 70);
+  
+  tft.drawFastHLine(12, 82, tft.width() - 24, TFT_LIGHTGREY);
+  
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextColor(TFT_LIGHTGREY);
+  tft.drawString("Firmware: v2.6 (Multi-Interface)", 15, 90);
+  
+  tft.setTextColor(activeProtocol != NONE ? TFT_GREEN : TFT_RED);
+  tft.drawString("Connection: ", 15, 102);
+  if (activeProtocol == USB) {
+    tft.drawString("USB Serial", 85, 102);
+  } else if (activeProtocol == WIFI) {
+    tft.drawString("Wi-Fi Client", 85, 102);
+  } else {
+    tft.drawString("Disconnected", 85, 102);
+  }
+  
+  tft.setTextColor(TFT_LIGHTGREY);
+  tft.drawString("Developer: Luiz F. R. Pimentel", 15, 114);
+  
+  if (WiFi.isConnected()) {
+    tft.setTextColor(TFT_CYAN);
+    tft.drawString("IP: " + WiFi.localIP().toString(), 15, 126);
+  } else {
+    tft.setTextColor(TFT_ORANGE);
+    tft.drawString("AP Mode: " + String(SSID_AP), 15, 126);
+  }
+}
+
+// NOVA FUNÇÃO
+void drawPanelBatteryTest() {
+  tft.setTextSize(1);
+  tft.setTextDatum(TL_DATUM);
+  
+  // Moldura do Painel de Energia
+  tft.fillRoundRect(10, 65, tft.width() - 20, 70, 5, TFT_BLACK);
+  tft.drawRoundRect(10, 65, tft.width() - 20, 70, 5, batteryPercentage > 20 ? TFT_GREEN : TFT_RED);
+  
+  tft.setTextColor(ACCENT_COLOR);
+  tft.drawString("MONITOR DE ENERGIA", 15, 70);
+  tft.drawFastHLine(10, 82, tft.width() - 20, ACCENT_COLOR);
+
+  // Leitura da Voltagem e Porcentagem
+  tft.setTextColor(TFT_WHITE);
+  tft.drawString("Voltagem: " + String(batteryVoltage) + "V", 15, 90);
+  
+  // Barra de progresso visual da bateria
+  tft.drawRect(120, 90, 30, 10, TFT_WHITE);
+  int barWidth = map(batteryPercentage, 0, 100, 0, 28);
+  tft.fillRect(121, 91, barWidth, 8, batteryPercentage > 20 ? TFT_GREEN : TFT_RED);
+
+  // Status do Carregamento / USB
+  tft.drawString("USB Conectado:", 15, 105);
+  if (isUsbConnected) {
+    tft.setTextColor(TFT_YELLOW);
+    tft.drawString("SIM (Carga Bloqueada)", 100, 105);
+  } else {
+    tft.setTextColor(TFT_GREEN);
+    tft.drawString("NAO (Usando Bateria)", 100, 105);
+  }
+
+  // Status do TP4056
+  tft.setTextColor(TFT_LIGHTGREY);
+  tft.drawString("Status CE:", 15, 120);
+  tft.drawString(isUsbConnected ? "DISABLED (0V)" : "ENABLED (3.3V)", 100, 120);
+}
+
+void startConfigPortal()
 {
   wifiConfigMode = true;
 
@@ -425,7 +876,6 @@ void drawPanelTechnical() void drawPanelGaming() void drawPanelClassic()
   IPAddress apIP(192, 168, 4, 1);
   WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
 
-  DNSServer dnsServer;
   dnsServer.start(53, "*", apIP);
 
   server.on("/", handleRoot);
@@ -436,6 +886,9 @@ void drawPanelTechnical() void drawPanelGaming() void drawPanelClassic()
   Serial.println(SSID_AP);
   Serial.print("IP: ");
   Serial.println(WiFi.softAPIP());
+  
+  // Atualiza LEDs para modo configuração
+  manualControl = false;
 }
 
 void handleRoot()
@@ -503,6 +956,9 @@ void handleWiFiSave()
   wifiStatusHandled = false;
   drawMainInterface();
   drawStatusMessage("Wi-Fi salvo. Tentando conectar...");
+  
+  // Atualiza LEDs
+  manualControl = false;
 }
 
 void drawConfigPortalScreen()
@@ -614,7 +1070,7 @@ void resetWiFiCredentials()
 
 void drawSettingsPanel()
 {
-  // Desenha o painel de settings (o IP e STATUS Wi-Fi são dinâmicos aqui)
+  // Desenha o painel de settings (o IP e STATUS Wi-Fi são dinâmicas aqui)
   tft.fillScreen(BACKGROUND_COLOR);
   tft.setTextColor(ACCENT_COLOR);
   tft.setTextSize(2);
@@ -685,23 +1141,21 @@ int mapButton(int bit)
   return buttonNumber;
 }
 
-int readButtons()
-{
+int readButtons() {
   digitalWrite(latchPin, LOW);
   delayMicroseconds(5);
   digitalWrite(latchPin, HIGH);
-  delayMicroseconds(5);
 
   int data = 0;
-  for (int i = 0; i < numBits; i++)
-  {
-    data = (data << 1) |
-           digitalRead(dataPin);
+  for (int i = 0; i < numBits; i++) {
+    // Lê o bit atual e coloca na posição correta
+    if (digitalRead(dataPin)) {
+      data |= (1 << i); 
+    }
     digitalWrite(clockPin, HIGH);
     delayMicroseconds(1);
     digitalWrite(clockPin, LOW);
   }
-
   return data;
 }
 
@@ -775,6 +1229,15 @@ void checkButtons()
               inSettingsMenu = true;
               drawSettingsPanel();
               drawStatusMessage("MENU: Configuracoes Abertas.");
+              
+              // Feedback visual nos LEDs
+              manualControl = true;
+              for(int j = 0; j < NUM_LEDS; j++) {
+                leds[j] = CRGB::Purple;
+              }
+              FastLED.show();
+              delay(300);
+              manualControl = false;
             }
           }
         }
@@ -796,6 +1259,15 @@ void checkButtons()
 
 void handleButtonPress(int buttonNumber)
 {
+  // Feedback visual nos LEDs quando um botão é pressionado
+  if (buttonNumber <= NUM_LEDS) {
+    manualControl = true;
+    leds[buttonNumber - 1] = CRGB::White;  // LED branco no botão pressionado
+    FastLED.show();
+  }
+  
+  delay(50);  // Pequeno delay para ver o feedback
+  
   // =================================================================
   // === LÓGICA DO MENU DE CONFIGURAÇÕES (Ação de clique rápido) =====
   // =================================================================
@@ -815,6 +1287,7 @@ void handleButtonPress(int buttonNumber)
     {
       drawStatusMessage("Pressione BTN 1 ou 2");
     }
+    manualControl = false;
     return;
   }
 
@@ -839,7 +1312,10 @@ void handleButtonPress(int buttonNumber)
     drawStatusMessage("Botao " + String(buttonNumber) + " (offline)");
   }
 
-  delay(300);
+  delay(250);
+
+  // Restaura o estado dos LEDs
+  manualControl = false;
 
   if (activeProtocol == NONE)
   {
@@ -866,10 +1342,34 @@ void checkConnectionChange()
     {
       updateConnectionStatus(activeProtocol);
       drawMainInterface();
+      manualControl = false; // Volta ao controle automático
     }
   }
 
   lastOverallConnectionStatus = currentOverallConnection;
+}
+
+void updateBatteryLogic() {
+  // A lógica agora depende estritamente do protocolo ativo identificado pelo software
+  // 
+  isUsbConnected = (activeProtocol == USB);
+
+  if (isUsbConnected) {
+    // Só entra aqui se o software do PC enviou "CONNECTED"
+    // HIGH liga o transistor -> Aterra o pino 8 -> CARGA BLOQUEADA
+    digitalWrite(PIN_TP4056_CE, HIGH); 
+  } else {
+    // Por padrão (Bateria, Fonte ou WiFi), a carga fica LIBERADA
+    // LOW desliga o transistor -> Pull-up de 10k ativa o pino 8 -> CARREGANDO
+    digitalWrite(PIN_TP4056_CE, LOW); 
+  }
+
+  // Leitura da bateria para o display 
+  int rawADC = 0;
+  for(int i=0; i<10; i++) rawADC += analogRead(PIN_BATT_ADC);
+  rawADC /= 10;
+  batteryVoltage = (rawADC / 4095.0) * 3.59 * 2.0;
+  batteryPercentage = constrain(map(batteryVoltage * 100, 320, 420, 0, 100), 0, 100);
 }
 
 // =========================================================================
@@ -883,8 +1383,22 @@ void setup()
 
   initializeDisplay();
   initButtons();
-
+  initLEDs();
+  pinMode(PIN_TP4056_CE, OUTPUT);
+  digitalWrite(PIN_TP4056_CE, LOW);
   drawBootScreen();
+  
+  // Animação dos LEDs durante a inicialização
+  manualControl = true;
+  for(int i = 0; i < NUM_LEDS; i++) {
+    leds[i] = CRGB::Yellow;
+    FastLED.show();
+    delay(100);
+    leds[i] = CRGB::Black;
+  }
+  FastLED.show();
+  manualControl = false;
+  
   delay(2500);
 
   initWiFi();
@@ -899,16 +1413,54 @@ void setup()
     Udp.begin(UDP_SEARCH_PORT);
     Serial.print("Escutando UDP na porta: ");
     Serial.println(UDP_SEARCH_PORT);
-    // activeProtocol = WIFI; // REMOVIDO: Só deve ser setado quando o cliente TCP se conecta
   }
 
   drawMainInterface();
 
   Serial.println("🎮 Esp32 DECK INICIADO");
+  Serial.println("✅ LEDs WS2812B configurados no pino 2");
+  Serial.print("📊 Quantidade de LEDs: ");
+  Serial.println(NUM_LEDS);
+  Serial.println("==========================================");
+  Serial.println("📝 COMANDOS LED DISPONÍVEIS:");
+  Serial.println("==========================================");
+  Serial.println("COMANDOS INDIVIDUAIS:");
+  Serial.println("  LED:0:FF0000      // LED 0 vermelho");
+  Serial.println("  LED:1:00FF00      // LED 1 verde");
+  Serial.println("  LED:2:0000FF      // LED 2 azul");
+  Serial.println("  LED:3:FFFF00      // LED 3 amarelo");
+  Serial.println("  LED:4:FF00FF      // LED 4 rosa");
+  Serial.println("  LED:5:00FFFF      // LED 5 ciano");
+  Serial.println("  LED:6:FF8800      // LED 6 laranja");
+  Serial.println("  LED:7:8800FF      // LED 7 roxo");
+  Serial.println("");
+  Serial.println("COMANDOS GLOBAIS:");
+  Serial.println("  ALL_LED:ON        // Liga todos branco");
+  Serial.println("  ALL_LED:OFF       // Desliga todos");
+  Serial.println("  ALL_LED:RAINBOW   // Efeito arco-íris");
+  Serial.println("  ALL_LED:BLINK     // Efeito piscante");
+  Serial.println("  ALL_LED:WAVE_BLUE // Onda azul");
+  Serial.println("  ALL_LED:FIRE      // Efeito fogo");
+  Serial.println("  ALL_LED:GRADIENT  // Gradiente");
+  Serial.println("  ALL_LED:TWINKLE   // Estrelas");
+  Serial.println("  ALL_LED:ALERT     // Alerta");
+  Serial.println("==========================================");
+  Serial.println("🔧 TESTE: Envie 'LED:0:FF0000' no Monitor Serial");
+  Serial.println("🔧 TESTE: Envie 'ALL_LED:OFF' para desligar");
+  Serial.println("==========================================");
 }
 
 void loop()
 {
+  // EXPERIMENTAL
+  updateBatteryLogic();
+
+  static unsigned long lastScreenUpdate = 0;
+  if (millis() - lastScreenUpdate > 1000) { // Atualiza os números na tela a cada 1 segundo
+    drawPanelBatteryTest();
+    lastScreenUpdate = millis();
+  }
+
   // A verificação de timeout da sequência
   if (!wifiConfigMode && sequenceState > 0 && millis() - sequenceTimer > SEQUENCE_TIMEOUT_MS)
   {
@@ -921,6 +1473,7 @@ void loop()
   {
     dnsServer.processNextRequest();
     server.handleClient();
+    // setStatusLEDs() é chamado por updateLEDs() quando necessário
   }
   else
   {
@@ -933,6 +1486,7 @@ void loop()
         drawMainInterface(); // Redesenha para mostrar o IP e status de rede
         drawStatusMessage(String("IP: ") + WiFi.localIP().toString());
         wifiStatusHandled = true; // Marca como handled (tratado)
+        manualControl = false;
       }
     }
     else
@@ -961,6 +1515,7 @@ void loop()
           if (activeProtocol != USB)
           {
             activeProtocol = WIFI; // SÓ SETA WIFI QUANDO O CLIENTE TCP CONECTA
+            manualControl = false;
           }
         }
       }
@@ -971,21 +1526,34 @@ void loop()
         {
           String msg = client.readStringUntil('\n');
           msg.trim();
-          if (msg == "PING")
+          
+          // Processa comandos LED
+          if (msg.startsWith("LED:") || msg.startsWith("ALL_LED:")) {
+            processLedCommand(msg);
+          }
+          else if (msg == "PING") {
             client.println("PONG");
-          if (msg == "DISCONNECT")
-          {
+          }
+          else if (msg == "DISCONNECT") {
             client.stop();
             Serial.println("🌐 Cliente Wi-Fi desconectado.");
-            if (activeProtocol == WIFI)
-            {
+            if (activeProtocol == WIFI) {
               activeProtocol = NONE;
+              manualControl = false;
             }
           }
         }
       }
     }
 
+    // Atualiza efeitos de LED contínuos se estiverem ativos
+    if (effectActive) {
+      updateEffect();
+    }
+    
+    // Atualiza LEDs de status (se não houver controle manual ou efeito)
+    updateLEDs();
+    
     checkConnectionChange();
   }
 
