@@ -40,7 +40,7 @@ const int SEQUENCE_LENGTH = 3;
 const int dataPin = 17;
 const int clockPin = 21;
 const int latchPin = 22;
-const int numBits = 8;
+const int numBits = 16;
 
 // =========================================================================
 // === CONFIGURAÇÕES DOS LEDs WS2812B (usando WS2812B que é compatível) ====
@@ -1110,33 +1110,26 @@ int mapButton(int bit)
 {
   int buttonNumber = 0;
 
-  // Mapeamento para 8 botões (se numBits=8)
+  // Mapeamento para 16 botões (0-15)
   switch (bit)
   {
-  case 7:
-    buttonNumber = 8;
-    break;
-  case 6:
-    buttonNumber = 7;
-    break;
-  case 5:
-    buttonNumber = 6;
-    break;
-  case 4:
-    buttonNumber = 5;
-    break;
-  case 3:
-    buttonNumber = 1;
-    break;
-  case 2:
-    buttonNumber = 2;
-    break;
-  case 1:
-    buttonNumber = 3;
-    break;
-  case 0:
-    buttonNumber = 4;
-    break;
+  case 0: buttonNumber = 9; break;
+  case 1: buttonNumber = 10; break;
+  case 2: buttonNumber = 11; break;
+  case 3: buttonNumber = 12; break;
+  case 4: buttonNumber = 16; break;
+  case 5: buttonNumber = 15; break;
+  case 6: buttonNumber = 14; break;
+  case 7: buttonNumber = 13; break;
+  case 8: buttonNumber = 8; break;
+  case 9: buttonNumber = 7; break;
+  case 10: buttonNumber = 6; break;
+  case 11: buttonNumber = 5; break;
+  case 12: buttonNumber = 1; break;
+  case 13: buttonNumber = 2; break;
+  case 14: buttonNumber = 3; break;
+  case 15: buttonNumber = 4; break;
+  default: buttonNumber = 0; break; // Caso inválido
   }
   return buttonNumber;
 }
@@ -1260,7 +1253,7 @@ void checkButtons()
 void handleButtonPress(int buttonNumber)
 {
   // Feedback visual nos LEDs quando um botão é pressionado
-  if (buttonNumber <= NUM_LEDS) {
+  if (buttonNumber >= 1 && buttonNumber <= NUM_LEDS) {  // Verifica se está dentro do range
     manualControl = true;
     leds[buttonNumber - 1] = CRGB::White;  // LED branco no botão pressionado
     FastLED.show();
@@ -1379,7 +1372,7 @@ void updateBatteryLogic() {
 void setup()
 {
   Serial.begin(115200);
-  preferences.begin(PREFS_KEY, false); // Inicia o namespace de preferências no setup
+  preferences.begin(PREFS_KEY, false);
 
   initializeDisplay();
   initButtons();
@@ -1418,9 +1411,11 @@ void setup()
   drawMainInterface();
 
   Serial.println("🎮 Esp32 DECK INICIADO");
-  Serial.println("✅ LEDs WS2812B configurados no pino 2");
+  Serial.println("✅ LEDs WS2812B configurados");
   Serial.print("📊 Quantidade de LEDs: ");
   Serial.println(NUM_LEDS);
+  Serial.print("🎯 Quantidade de Botões: ");
+  Serial.println(numBits);  // Agora mostra 16
   Serial.println("==========================================");
   Serial.println("📝 COMANDOS LED DISPONÍVEIS:");
   Serial.println("==========================================");
@@ -1433,6 +1428,14 @@ void setup()
   Serial.println("  LED:5:00FFFF      // LED 5 ciano");
   Serial.println("  LED:6:FF8800      // LED 6 laranja");
   Serial.println("  LED:7:8800FF      // LED 7 roxo");
+  Serial.println("  LED:8:FFFFFF      // LED 8 branco");
+  Serial.println("  LED:9:00FF88      // LED 9 verde água");
+  Serial.println("  LED:10:FF0088     // LED 10 rosa escuro");
+  Serial.println("  LED:11:88FF00     // LED 11 verde limão");
+  Serial.println("  LED:12:0088FF     // LED 12 azul claro");
+  Serial.println("  LED:13:880000     // LED 13 vermelho escuro");
+  Serial.println("  LED:14:008800     // LED 14 verde escuro");
+  Serial.println("  LED:15:000088     // LED 15 azul escuro");
   Serial.println("");
   Serial.println("COMANDOS GLOBAIS:");
   Serial.println("  ALL_LED:ON        // Liga todos branco");
