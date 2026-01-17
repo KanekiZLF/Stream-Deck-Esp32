@@ -29,9 +29,9 @@ const int UDP_SEARCH_PORT = 4210;
 const char *UDP_DISCOVER_MSG = "ESP32_DECK_DISCOVER";
 const char *UDP_ACK_MSG = "ESP32_DECK_ACK";
 
-// Configuração da Senha de Acesso (Sequência: 1, 4, 8)
+// Configuração da Senha de Acesso (Sequência: 1, 5, 8)
 const int SEQUENCE_TIMEOUT_MS = 2000; // 2 segundos
-const int SEQUENCE_TARGET[] = {1, 4, 8};
+const int SEQUENCE_TARGET[] = {1, 5, 8};
 const int SEQUENCE_LENGTH = 3;
 
 // =========================================================================
@@ -47,7 +47,7 @@ const int numBits = 16;
 // =========================================================================
 #define LED_PIN 12        // Pino de dados dos LEDs WS2812B
 #define NUM_LEDS 16       // Quantidade de LEDs na sua fita
-#define LED_BRIGHTNESS 50 // Brilho (0-255)
+int LED_BRIGHTNESS = 150; // Brilho (0-255)
 
 #define PIN_BATT_ADC 33    // Pino para ler o divisor de tensão (ADC1_CH6)
 #define PIN_TP4056_CE 13    // Conectado ao pino CE do TP4056 (através de um transistor se necessário)
@@ -100,6 +100,20 @@ unsigned long effectTimer = 0;
 bool manualControl = false; // Nova flag: quando true, updateLEDs() não faz nada
 
 // =========================================================================
+// === CONFIGURAÇÕES DO ENCODER EC11 =======================================
+// =========================================================================
+const int ENCODER_CLK_PIN = 25;
+const int ENCODER_DT_PIN = 26;
+const int ENCODER_BTN_PIN = 27;
+
+// Variáveis para o encoder
+bool encoderModeActive = false;
+int lastEncoderState = 0;
+int encoderBtnLastState = HIGH;
+unsigned long lastEncoderBtnPress = 0;
+const unsigned long ENCODER_DEBOUNCE_DELAY = 50;
+
+// =========================================================================
 // === CONFIGURAÇÃO DE CORES ===============================================
 // =========================================================================
 #define BACKGROUND_COLOR TFT_BLACK
@@ -135,7 +149,12 @@ void updateConnectionStatus(ConnectionProtocol protocol);
 void drawStatusMessage(const String &message);
 void resetWiFiCredentials();
 void checkSerialCommands();
-
+void updateBatteryDisplay();
+void initEncoder();
+void checkEncoder();
+void handleEncoderButton();
+void handleEncoderRotation();
+void updateBrightnessDisplay();
 void initWiFi();
 void startConfigPortal();
 void handleRoot();
@@ -640,6 +659,7 @@ void drawMainInterface()
   tft.setTextDatum(TC_DATUM);
   tft.drawString("ESP32 STREAM DECK", tft.width() / 2, 8);
   tft.drawFastHLine(10, 20, tft.width() - 20, TFT_DARKGREY);
+
   // Área de status
   tft.fillRoundRect(10, 25, tft.width() - 20, 25, 5, TFT_DARKGREY);
   updateConnectionStatus(activeProtocol); // Usa o protocolo ativo
@@ -826,41 +846,36 @@ void drawPanelClassic() {
 }
 
 // NOVA FUNÇÃO
+// NOVA FUNÇÃO
 void drawPanelBatteryTest() {
   tft.setTextSize(1);
   tft.setTextDatum(TL_DATUM);
   
-  // Moldura do Painel de Energia
-  tft.fillRoundRect(10, 65, tft.width() - 20, 70, 5, TFT_BLACK);
-  tft.drawRoundRect(10, 65, tft.width() - 20, 70, 5, batteryPercentage > 20 ? TFT_GREEN : TFT_RED);
+  // Moldura do Painel de Energia (desenha apenas uma vez)
+  tft.fillRoundRect(10, 65, tft.width() - 20, 85, 5, TFT_BLACK); // Aumentei a altura para 85
+  tft.drawRoundRect(10, 65, tft.width() - 20, 85, 5, TFT_CYAN);  // Aumentei a altura para 85
   
   tft.setTextColor(ACCENT_COLOR);
   tft.drawString("MONITOR DE ENERGIA", 15, 70);
   tft.drawFastHLine(10, 82, tft.width() - 20, ACCENT_COLOR);
 
-  // Leitura da Voltagem e Porcentagem
+  // Títulos estáticos (desenha apenas uma vez)
   tft.setTextColor(TFT_WHITE);
-  tft.drawString("Voltagem: " + String(batteryVoltage) + "V", 15, 90);
+  tft.drawString("Voltagem:", 15, 90);
   
-  // Barra de progresso visual da bateria
+  // Desenha o quadro da barra de bateria (estático)
   tft.drawRect(120, 90, 30, 10, TFT_WHITE);
-  int barWidth = map(batteryPercentage, 0, 100, 0, 28);
-  tft.fillRect(121, 91, barWidth, 8, batteryPercentage > 20 ? TFT_GREEN : TFT_RED);
-
-  // Status do Carregamento / USB
+  
   tft.drawString("USB Conectado:", 15, 105);
-  if (isUsbConnected) {
-    tft.setTextColor(TFT_YELLOW);
-    tft.drawString("SIM (Carga Bloqueada)", 100, 105);
-  } else {
-    tft.setTextColor(TFT_GREEN);
-    tft.drawString("NAO (Usando Bateria)", 100, 105);
-  }
-
-  // Status do TP4056
   tft.setTextColor(TFT_LIGHTGREY);
   tft.drawString("Status CE:", 15, 120);
-  tft.drawString(isUsbConnected ? "DISABLED (0V)" : "ENABLED (3.3V)", 100, 120);
+  
+  // Adiciona linha para o brilho dos LEDs
+  tft.drawString("Brilho LEDs:", 15, 135);
+  
+  // Chama a função para atualizar os valores dinâmicos
+  updateBatteryDisplay();
+  updateBrightnessDisplay(); // Atualiza o valor do brilho
 }
 
 void startConfigPortal()
@@ -1365,6 +1380,160 @@ void updateBatteryLogic() {
   batteryPercentage = constrain(map(batteryVoltage * 100, 320, 420, 0, 100), 0, 100);
 }
 
+// Implementação da função:
+void updateBatteryDisplay() {
+  // Atualiza APENAS os valores da bateria, sem redesenhar o painel inteiro
+  tft.setTextSize(1);
+  tft.setTextDatum(TL_DATUM);
+  
+  // Atualiza voltagem
+  tft.setTextColor(TFT_WHITE);
+  tft.fillRect(80, 90, 40, 8, TFT_BLACK); // Limpa área anterior
+  tft.drawString(String(batteryVoltage, 2) + "V", 80, 90);
+  
+  // Atualiza barra de progresso
+  tft.drawRect(120, 90, 30, 10, TFT_WHITE);
+  int barWidth = map(batteryPercentage, 0, 100, 0, 28);
+  tft.fillRect(121, 91, barWidth, 8, batteryPercentage > 20 ? TFT_GREEN : TFT_RED);
+  
+  // Atualiza porcentagem
+  tft.fillRect(155, 90, 25, 8, TFT_BLACK); // Limpa área anterior
+  tft.drawString(String(batteryPercentage) + "%", 155, 90);
+  
+  // Status do USB
+  tft.fillRect(100, 105, 90, 8, TFT_BLACK); // Limpa área anterior
+  if (isUsbConnected) {
+    tft.setTextColor(TFT_YELLOW);
+    tft.drawString("SIM (Carga Bloqueada)", 100, 105);
+  } else {
+    tft.setTextColor(TFT_GREEN);
+    tft.drawString("NAO (Usando Bateria)", 100, 105);
+  }
+  
+  // Status do TP4056
+  tft.setTextColor(TFT_LIGHTGREY);
+  tft.fillRect(100, 120, 90, 8, TFT_BLACK); // Limpa área anterior
+  tft.drawString(isUsbConnected ? "DISABLED (0V)" : "ENABLED (3.3V)", 100, 120);
+}
+
+void initEncoder() {
+  pinMode(ENCODER_CLK_PIN, INPUT_PULLUP);
+  pinMode(ENCODER_DT_PIN, INPUT_PULLUP);
+  pinMode(ENCODER_BTN_PIN, INPUT_PULLUP);
+  
+  lastEncoderState = digitalRead(ENCODER_CLK_PIN);
+  
+  Serial.println("✅ Encoder EC11 inicializado");
+}
+
+void checkEncoder() {
+  // Verifica o botão do encoder
+  handleEncoderButton();
+  
+  // Se o modo encoder estiver ativo, verifica a rotação
+  if (encoderModeActive) {
+    handleEncoderRotation();
+  }
+}
+
+void handleEncoderButton() {
+  int btnState = digitalRead(ENCODER_BTN_PIN);
+  
+  // Detecção de borda de descida (botão pressionado)
+  if (btnState == LOW && encoderBtnLastState == HIGH) {
+    unsigned long now = millis();
+    
+    // Debounce
+    if (now - lastEncoderBtnPress > ENCODER_DEBOUNCE_DELAY) {
+      // Alterna o modo do encoder
+      encoderModeActive = !encoderModeActive;
+      
+      if (encoderModeActive) {
+        // Entrou no modo de ajuste de brilho
+        manualControl = true;
+        effectActive = false;
+        
+        // Feedback visual: LEDs em amarelo
+        fill_solid(leds, NUM_LEDS, CRGB::Yellow);
+        FastLED.show();
+        
+        drawStatusMessage("Modo Brilho: Gire o encoder");
+        Serial.println("🎚️ Modo ajuste de brilho ATIVADO");
+      } else {
+        // Saiu do modo de ajuste de brilho
+        manualControl = false;
+        
+        drawStatusMessage("Modo Brilho Desativado");
+        Serial.println("🎚️ Modo ajuste de brilho DESATIVADO");
+        
+        // Atualiza o display com o brilho atual
+        updateBrightnessDisplay();
+      }
+      
+      lastEncoderBtnPress = now;
+    }
+  }
+  
+  encoderBtnLastState = btnState;
+}
+
+void handleEncoderRotation() {
+  int currentState = digitalRead(ENCODER_CLK_PIN);
+  
+  if (currentState != lastEncoderState) {
+    // Houve uma mudança no encoder
+    int dtState = digitalRead(ENCODER_DT_PIN);
+    
+    if (dtState != currentState) {
+      // Sentido horário (aumenta brilho)
+      if (LED_BRIGHTNESS < 250) {
+        LED_BRIGHTNESS += 5;
+        FastLED.setBrightness(LED_BRIGHTNESS);
+        FastLED.show();
+        
+        // Feedback visual: LEDs mais brilhantes
+        fill_solid(leds, NUM_LEDS, CRGB::Yellow);
+        FastLED.show();
+        
+        Serial.print("🔆 Brilho aumentado para: ");
+        Serial.println(LED_BRIGHTNESS);
+        drawStatusMessage("Brilho: " + String(LED_BRIGHTNESS));
+      }
+    } else {
+      // Sentido anti-horário (diminui brilho)
+      if (LED_BRIGHTNESS > 5) {
+        LED_BRIGHTNESS -= 5;
+        FastLED.setBrightness(LED_BRIGHTNESS);
+        FastLED.show();
+        
+        // Feedback visual: LEDs menos brilhantes
+        fill_solid(leds, NUM_LEDS, CRGB::Yellow);
+        FastLED.show();
+        
+        Serial.print("🔅 Brilho diminuido para: ");
+        Serial.println(LED_BRIGHTNESS);
+        drawStatusMessage("Brilho: " + String(LED_BRIGHTNESS));
+      }
+    }
+    
+    // Atualiza o display com o brilho atual
+    updateBrightnessDisplay();
+  }
+  
+  lastEncoderState = currentState;
+}
+
+void updateBrightnessDisplay() {
+  // Atualiza apenas a parte do brilho no painel da bateria
+  tft.setTextSize(1);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextColor(TFT_WHITE);
+  
+  // Limpa a área e desenha o valor do brilho
+  tft.fillRect(80, 135, 60, 8, TFT_BLACK);
+  tft.drawString(String(LED_BRIGHTNESS), 80, 135);
+}
+
 // =========================================================================
 // === SETUP e LOOP ========================================================
 // =========================================================================
@@ -1377,6 +1546,7 @@ void setup()
   initializeDisplay();
   initButtons();
   initLEDs();
+  initEncoder();
   pinMode(PIN_TP4056_CE, OUTPUT);
   digitalWrite(PIN_TP4056_CE, LOW);
   drawBootScreen();
@@ -1412,10 +1582,17 @@ void setup()
 
   Serial.println("🎮 Esp32 DECK INICIADO");
   Serial.println("✅ LEDs WS2812B configurados");
+  Serial.println("✅ Encoder EC11 configurado");
   Serial.print("📊 Quantidade de LEDs: ");
   Serial.println(NUM_LEDS);
   Serial.print("🎯 Quantidade de Botões: ");
-  Serial.println(numBits);  // Agora mostra 16
+  Serial.println(numBits);
+  Serial.print("🔆 Brilho inicial: ");
+  Serial.println(LED_BRIGHTNESS);
+  Serial.println("==========================================");
+  Serial.println("🎚️ CONTROLE DO ENCODER:");
+  Serial.println("  • Clique: Ativa/desativa modo brilho");
+  Serial.println("  • Gire: Ajusta brilho dos LEDs");
   Serial.println("==========================================");
   Serial.println("📝 COMANDOS LED DISPONÍVEIS:");
   Serial.println("==========================================");
@@ -1455,12 +1632,20 @@ void setup()
 
 void loop()
 {
-  // EXPERIMENTAL
+  // Atualiza a lógica da bateria
   updateBatteryLogic();
 
   static unsigned long lastScreenUpdate = 0;
-  if (millis() - lastScreenUpdate > 1000) { // Atualiza os números na tela a cada 1 segundo
-    drawPanelBatteryTest();
+  static unsigned long lastEncoderCheck = 0;
+  
+  // Verifica o encoder mais frequentemente (a cada 10ms)
+  if (millis() - lastEncoderCheck > 10) {
+    checkEncoder();
+    lastEncoderCheck = millis();
+  }
+
+  if (millis() - lastScreenUpdate > 1000) { // Atualiza apenas os valores a cada 1 segundo
+    updateBatteryDisplay();  // <-- Usa a nova função que atualiza apenas os valores
     lastScreenUpdate = millis();
   }
 
