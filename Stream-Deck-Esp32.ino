@@ -21,10 +21,13 @@ using fs::FS;
 const char *SSID_AP = "ESP32-Deck-Setup";
 const char *PASS_AP = "12345678";
 const char *PREFS_KEY = "wifi_config";
+const char *PREFS_BRIGHTNESS_KEY = "led_brightness";
+const char *PREFS_EFFECT_KEY = "led_effect";
 const int TCP_PORT = 8000;
 const char* FIRMWARE_VERSION = "v2.8 Professional";
 const char* DEVELOPER = "Luiz F. R. Pimentel";
 const char* GITHUB = "github.com/KanekiZLF";
+
 
 // Constantes para Busca UDP
 const int UDP_SEARCH_PORT = 4210;
@@ -44,7 +47,7 @@ const int numBits = 16;
 // =========================================================================
 #define LED_PIN 12
 #define NUM_LEDS 16
-int LED_BRIGHTNESS = 150;
+int LED_BRIGHTNESS = 50;
 
 // =========================================================================
 // === CONFIGURACOES DA BATERIA ============================================
@@ -64,6 +67,8 @@ int lastBatteryPercentage = -1; // Para controle de atualização
 TFT_eSPI tft = TFT_eSPI();
 #define SCREEN_WIDTH 240
 #define SCREEN_HEIGHT 135
+int lastMenuSelection = -1;
+int lastMenuScrollOffset = -1;
 
 // =========================================================================
 // === CONFIGURACOES DO ENCODER EC11 =======================================
@@ -75,6 +80,17 @@ const int ENCODER_BTN_PIN = 27;
 // =========================================================================
 // === VARIAVEIS GLOBAIS ===================================================
 // =========================================================================
+
+String savedEffect = "NONE";  // Efeito salvo nas preferências
+bool shouldRestoreEffect = false;  // Flag para restaurar efeito após feedback
+unsigned long feedbackStartTime = 0;  // Quando começou o feedback
+int feedbackDuration = 500;  // Duração do feedback em ms
+bool isInFeedbackMode = false;  // Se está mostrando feedback de conexão
+
+// Máscara de LEDs - LEDs com cores fixas
+bool ledMask[NUM_LEDS] = {false, false, false, false, false, false, false, false,
+                          false, false, false, false, false, false, false, false};
+CRGB ledFixedColors[NUM_LEDS]; // Cores fixas para LEDs mascarados
 
 // Enum para rastrear o protocolo ativo
 enum ConnectionProtocol {
@@ -104,9 +120,11 @@ SystemState currentState = STATE_LOADING;
 int menuSelection = 0;
 int menuScrollOffset = 0;
 const int MENU_ITEMS_COUNT = 8;  // Incluindo "Sobre Dispositivo"
-const int VISIBLE_MENU_ITEMS = 6; // Itens visíveis na tela
+const int VISIBLE_MENU_ITEMS = 7; // Itens visíveis na tela
 int wifiMenuSelection = 0;
 const int WIFI_MENU_ITEMS = 3;
+
+int lastWifiMenuSelection = -1;
 
 // LEDs - NÃO altera cor quando entra no menu
 CRGB leds[NUM_LEDS];
@@ -191,6 +209,10 @@ void processLedCommand(const String& command);
 void processIndividualLedCommand(const String& command);
 void processAllLedCommand(const String& command);
 void updateEffect();
+//void showCurrentStatusLEDs();
+
+void clearLedMask();
+void applyLedMask(); // Aplica a máscara sobre os LEDs
 
 // Wi-Fi
 void initWiFi();
@@ -323,17 +345,21 @@ void drawMainScreen() {
     tft.setTextColor(TEXT_COLOR);
     tft.setTextSize(1);
     tft.setTextDatum(TL_DATUM);
-    
+    tft.setTextColor(TFT_WHITE);
+    tft.drawString("ESP-Deck ", 5, 8);
     String statusText = "";
     if(activeProtocol == USB) {
         statusText = "USB";
+        tft.setTextColor(TFT_GREEN);
     } else if(activeProtocol == WIFI) {
         statusText = "Wi-Fi";
+        tft.setTextColor(TFT_GREEN);
     } else {
         statusText = "Desconectado";
+        tft.setTextColor(TFT_RED);
     }
-    
-    tft.drawString("ESP-Deck " + statusText, 5, 8);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawString(statusText, 80, 8);
     
     // Bateria no canto direito (com limpeza de area)
     tft.fillRect(SCREEN_WIDTH - 50, 4, 50, 12, SECONDARY_COLOR); // Limpa area da bateria
@@ -381,16 +407,36 @@ void drawMainScreen() {
 }
 
 void drawSettingsMenu() {
-    tft.fillScreen(MENU_BG_COLOR);
+    bool fullRedraw = false;
     
-    // Cabecalho
-    tft.fillRect(0, 0, SCREEN_WIDTH, 22, PRIMARY_COLOR);
-    tft.setTextColor(BACKGROUND_COLOR);
-    tft.setTextSize(1);
-    tft.setTextDatum(MC_DATUM);
-    tft.drawString("CONFIGURACOES", SCREEN_WIDTH / 2, 11);
+    // Verifica se precisa redesenhar tudo
+    if(menuSelection != lastMenuSelection || menuScrollOffset != lastMenuScrollOffset) {
+        if(lastMenuSelection == -1) {
+            fullRedraw = true;
+        }
+        
+        // Salva estados anteriores
+        lastMenuSelection = menuSelection;
+        lastMenuScrollOffset = menuScrollOffset;
+    }
     
-    // Lista de itens do menu
+    if(fullRedraw) {
+        tft.fillScreen(MENU_BG_COLOR);
+        
+        // 1. Cabeçalho mais compacto
+        tft.fillRect(0, 0, SCREEN_WIDTH, 18, PRIMARY_COLOR);
+        tft.setTextColor(BACKGROUND_COLOR);
+        tft.setTextSize(1);
+        tft.setTextDatum(MC_DATUM);
+        tft.drawString("CONFIGURACOES", SCREEN_WIDTH / 2, 9);
+        
+        // 5. Instruções fixadas no final da tela
+        tft.setTextColor(ACCENT_COLOR);
+        tft.setTextDatum(BC_DATUM);
+        tft.drawString("Gire: Navegar  |  Click: Selecionar", SCREEN_WIDTH / 2, 130);
+    }
+    
+    // 2. Lista de itens do menu
     String menuItems[] = {
         "Configurar Wi-Fi",
         "Ajustar Brilho LEDs", 
@@ -399,28 +445,36 @@ void drawSettingsMenu() {
         "Configuracoes Avancadas",
         "Sobre Dispositivo",
         "Teste de Sistema",
-        "Voltar ao Menu Principal"
+        "Voltar"
     };
     
-    // Calcular scroll
+    // Calcular scroll para 8 itens no total
     if(menuSelection < menuScrollOffset) {
         menuScrollOffset = menuSelection;
     } else if(menuSelection >= menuScrollOffset + VISIBLE_MENU_ITEMS) {
         menuScrollOffset = menuSelection - VISIBLE_MENU_ITEMS + 1;
     }
     
-    // Desenhar itens visiveis
+    // 3. Layout otimizado para 240x135
+    int startY = 25;      // Onde começa o primeiro item
+    int rowHeight = 14;   // Altura de cada linha
+    
+    // Desenhar itens visíveis (7 itens na tela)
     for(int i = 0; i < VISIBLE_MENU_ITEMS; i++) {
         int itemIndex = i + menuScrollOffset;
         if(itemIndex >= MENU_ITEMS_COUNT) break;
         
-        int yPos = 35 + (i * 18);
+        int yPos = startY + (i * rowHeight);
+        
+        // Limpa apenas a área deste item
+        tft.fillRect(5, yPos - 2, SCREEN_WIDTH - 10, 12, MENU_BG_COLOR);
         
         if(itemIndex == menuSelection) {
-            tft.fillRect(5, yPos - 2, SCREEN_WIDTH - 10, 14, HIGHLIGHT_COLOR);
+            // Retângulo de seleção
+            tft.fillRect(5, yPos - 2, SCREEN_WIDTH - 10, 12, HIGHLIGHT_COLOR);
             tft.setTextColor(BACKGROUND_COLOR);
         } else {
-            tft.fillRect(5, yPos - 2, SCREEN_WIDTH - 10, 14, PANEL_COLOR);
+            tft.fillRect(5, yPos - 2, SCREEN_WIDTH - 10, 12, PANEL_COLOR);
             tft.setTextColor(TEXT_COLOR);
         }
         
@@ -440,72 +494,60 @@ void drawSettingsMenu() {
             tft.drawString(">", SCREEN_WIDTH - 10, yPos);
         }
     }
-    
-    // Barra de scroll se necessario
-    if(MENU_ITEMS_COUNT > VISIBLE_MENU_ITEMS) {
-        int scrollBarHeight = VISIBLE_MENU_ITEMS * 18 - 4;
-        int scrollBarWidth = 4;
-        int scrollBarX = SCREEN_WIDTH - 8;
-        int scrollBarY = 35;
-        
-        tft.drawRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TEXT_COLOR);
-        
-        // Posicao do indicador
-        int indicatorHeight = (scrollBarHeight * VISIBLE_MENU_ITEMS) / MENU_ITEMS_COUNT;
-        int indicatorY = scrollBarY + (scrollBarHeight * menuScrollOffset) / MENU_ITEMS_COUNT;
-        
-        tft.fillRect(scrollBarX, indicatorY, scrollBarWidth, indicatorHeight, ACCENT_COLOR);
-    }
-    
-    // Contador de itens
-    tft.setTextColor(ACCENT_COLOR);
-    tft.setTextSize(1);
-    tft.setTextDatum(TR_DATUM);
-    tft.drawString(String(menuSelection + 1) + "/" + String(MENU_ITEMS_COUNT), SCREEN_WIDTH - 5, 125);
-    
-    // Instrucoes
-    tft.setTextColor(TEXT_COLOR);
-    tft.setTextDatum(BC_DATUM);
-    tft.drawString("Gire: Navegar  |  Encoder: Selecionar", SCREEN_WIDTH / 2, 132);
 }
 
 void drawWifiConfigMenu() {
-    tft.fillScreen(MENU_BG_COLOR);
+    //static int lastWifiMenuSelection = -1;
     
-    // Cabecalho
-    tft.fillRect(0, 0, SCREEN_WIDTH, 22, PRIMARY_COLOR);
-    tft.setTextColor(BACKGROUND_COLOR);
-    tft.setTextSize(1);
-    tft.setTextDatum(MC_DATUM);
-    tft.drawString("CONFIGURAR WI-FI", SCREEN_WIDTH / 2, 11);
+    bool fullRedraw = (lastWifiMenuSelection == -1);
+    lastWifiMenuSelection = wifiMenuSelection;
     
-    // Status atual em painel superior
-    tft.fillRect(10, 30, SCREEN_WIDTH - 20, 35, PANEL_COLOR);
-    tft.drawRect(10, 30, SCREEN_WIDTH - 20, 35, SECONDARY_COLOR);
-    
-    tft.setTextColor(TEXT_COLOR);
-    tft.setTextDatum(TL_DATUM);
-    tft.drawString("Status:", 15, 38);
-    
-    if(WiFi.status() == WL_CONNECTED) {
-        tft.setTextColor(SUCCESS_COLOR);
-        tft.drawString("CONECTADO", 55, 38);
+    if(fullRedraw) {
+        tft.fillScreen(MENU_BG_COLOR);
+        
+        // Cabecalho
+        tft.fillRect(0, 0, SCREEN_WIDTH, 18, PRIMARY_COLOR);
+        tft.setTextColor(BACKGROUND_COLOR);
+        tft.setTextSize(1);
+        tft.setTextDatum(MC_DATUM);
+        tft.drawString("CONFIGURAR WI-FI", SCREEN_WIDTH / 2, 9);
+        
+        // Status atual em painel superior
+        tft.fillRect(10, 25, SCREEN_WIDTH - 20, 30, PANEL_COLOR);
+        tft.drawRect(10, 25, SCREEN_WIDTH - 20, 30, SECONDARY_COLOR);
+        
         tft.setTextColor(TEXT_COLOR);
-        tft.drawString("Rede:", 15, 52);
-        tft.drawString(WiFi.SSID().substring(0, 15), 55, 52);
-    } else {
-        tft.setTextColor(WARNING_COLOR);
-        tft.drawString("DESCONECTADO", 55, 38);
+        tft.setTextDatum(TL_DATUM);
+        tft.drawString("Status:", 15, 32);
+        
+        if(WiFi.status() == WL_CONNECTED) {
+            tft.setTextColor(SUCCESS_COLOR);
+            tft.drawString("CONECTADO", 55, 32);
+            tft.setTextColor(TEXT_COLOR);
+            tft.drawString("Rede:", 15, 44);
+            tft.drawString(WiFi.SSID().substring(0, 15), 55, 44);
+        } else {
+            tft.setTextColor(WARNING_COLOR);
+            tft.drawString("DESCONECTADO", 55, 32);
+        }
+        
+        // Instrucoes
+        tft.setTextColor(ACCENT_COLOR);
+        tft.setTextDatum(BC_DATUM);
+        tft.drawString("Encoder: Selecionar opcao", SCREEN_WIDTH / 2, 130);
     }
     
-    // Opcoes do menu Wi-Fi - melhor organizadas
+    // Opcoes do menu Wi-Fi
     String wifiOptions[] = {"Limpar Credenciais", "Configurar Nova Rede", "Voltar"};
     
-    int optionHeight = 25;
-    int startY = 75;
+    int optionHeight = 22;
+    int startY = 60;
     
     for(int i = 0; i < WIFI_MENU_ITEMS; i++) {
         int yPos = startY + (i * optionHeight);
+        
+        // Limpa apenas a área deste item
+        tft.fillRect(15, yPos - 2, SCREEN_WIDTH - 30, optionHeight - 4, MENU_BG_COLOR);
         
         if(i == wifiMenuSelection) {
             tft.fillRect(15, yPos - 2, SCREEN_WIDTH - 30, optionHeight - 4, HIGHLIGHT_COLOR);
@@ -524,11 +566,6 @@ void drawWifiConfigMenu() {
             tft.drawString(">", SCREEN_WIDTH - 20, yPos);
         }
     }
-    
-    // Instrucoes
-    tft.setTextColor(ACCENT_COLOR);
-    tft.setTextDatum(BC_DATUM);
-    tft.drawString("Encoder: Selecionar opcao", SCREEN_WIDTH / 2, 132);
 }
 
 void drawWifiConfigPortal() {
@@ -556,33 +593,76 @@ void drawWifiConfigPortal() {
 void drawBrightnessConfigScreen() {
     tft.fillScreen(MENU_BG_COLOR);
     
-    // Cabecalho
-    tft.fillRect(0, 0, SCREEN_WIDTH, 22, PRIMARY_COLOR);
+    // 1. CABEÇALHO COM ÍCONE DE BRILHO
+    tft.fillRect(0, 0, SCREEN_WIDTH, 24, PRIMARY_COLOR);
     tft.setTextColor(BACKGROUND_COLOR);
     tft.setTextSize(1);
     tft.setTextDatum(MC_DATUM);
-    tft.drawString("BRILHO LEDs", SCREEN_WIDTH / 2, 11);
     
-    // Valor atual grande
+    // Desenha ícone de brilho (sol)
+    int iconX = SCREEN_WIDTH / 2 - 40;
+    tft.fillCircle(iconX, 12, 4, BACKGROUND_COLOR);
+    for(int i = 0; i < 8; i++) {
+        float angle = i * 45 * PI / 180;
+        int x1 = iconX + (int)(cos(angle) * 8);
+        int y1 = 12 + (int)(sin(angle) * 8);
+        int x2 = iconX + (int)(cos(angle) * 12);
+        int y2 = 12 + (int)(sin(angle) * 12);
+        tft.drawLine(x1, y1, x2, y2, BACKGROUND_COLOR);
+    }
+    
+    tft.drawString("BRILHO LEDs", SCREEN_WIDTH / 2, 12);
+    
+    // 2. VALOR ATUAL COM DESTAQUE
     tft.setTextColor(ACCENT_COLOR);
     tft.setTextSize(3);
     tft.setTextDatum(MC_DATUM);
-    tft.drawString(String(LED_BRIGHTNESS), SCREEN_WIDTH / 2, 50);
+    tft.drawString(String(LED_BRIGHTNESS), SCREEN_WIDTH / 2, 45);
     
     tft.setTextSize(1);
     tft.setTextColor(TEXT_COLOR);
-    tft.drawString("Nivel (0-255)", SCREEN_WIDTH / 2, 70);
+    tft.drawString("Nivel (5-255)", SCREEN_WIDTH / 2, 65);
     
-    // Barra de progresso
+    // 3. INDICADOR DE STATUS
+    tft.setTextSize(1);
+    tft.setTextDatum(MC_DATUM);
+    
+    if(LED_BRIGHTNESS <= 50) {
+        tft.setTextColor(SECONDARY_COLOR);
+        tft.drawString("BAIXO", SCREEN_WIDTH / 2, 75);
+    } else if(LED_BRIGHTNESS <= 150) {
+        tft.setTextColor(SUCCESS_COLOR);
+        tft.drawString("MEDIO", SCREEN_WIDTH / 2, 75);
+    } else {
+        tft.setTextColor(WARNING_COLOR);
+        tft.drawString("ALTO", SCREEN_WIDTH / 2, 75);
+    }
+    
+    // 4. BARRA DE PROGRESSO COM MARCADORES
     int barWidth = 180;
-    int barHeight = 12;
+    int barHeight = 14;
     int barX = (SCREEN_WIDTH - barWidth) / 2;
     int barY = 85;
     
-    tft.drawRect(barX, barY, barWidth, barHeight, SECONDARY_COLOR);
+    // Moldura da barra
+    tft.drawRoundRect(barX, barY, barWidth, barHeight, 3, SECONDARY_COLOR);
     
-    int progressWidth = map(LED_BRIGHTNESS, 0, 255, 0, barWidth - 2);
-    tft.fillRect(barX + 1, barY + 1, progressWidth, barHeight - 2, ACCENT_COLOR);
+    // Preenchimento gradiente
+    int progressWidth = map(LED_BRIGHTNESS, 5, 255, 0, barWidth - 2);
+    for(int i = 0; i < progressWidth; i++) {
+        int colorPosition = map(i, 0, barWidth - 2, 0, 255);
+        uint16_t segmentColor;
+        
+        if(i < (barWidth - 2) / 3) {
+            segmentColor = tft.color565(0, colorPosition * 2, 100); // Azul para verde
+        } else if(i < (barWidth - 2) * 2 / 3) {
+            segmentColor = tft.color565(colorPosition, 180, 0); // Verde para amarelo
+        } else {
+            segmentColor = tft.color565(255, colorPosition, 0); // Amarelo para laranja
+        }
+        
+        tft.drawFastVLine(barX + 1 + i, barY + 1, barHeight - 2, segmentColor);
+    }
     
     // Marcadores
     tft.setTextSize(1);
@@ -591,89 +671,217 @@ void drawBrightnessConfigScreen() {
     tft.drawString("Min", barX, barY + barHeight + 5);
     tft.drawString("Max", barX + barWidth, barY + barHeight + 5);
     
-    // Instrucoes
+    // Marcador numérico no meio
+    tft.setTextColor(SECONDARY_COLOR);
+    tft.drawString("128", barX + barWidth/2, barY + barHeight + 5);
+    
+    // 5. INDICADOR VISUAL NA BARRA
+    int markerX = barX + progressWidth;
+    tft.fillTriangle(markerX, barY - 5, markerX - 4, barY - 1, markerX + 4, barY - 1, ACCENT_COLOR);
+    
+    // 6. EFETOS VISUAIS DE EXEMPLO
+    tft.setTextColor(SECONDARY_COLOR);
     tft.setTextDatum(MC_DATUM);
+    tft.drawString("Efeito de exemplo:", SCREEN_WIDTH / 2, 115);
+    
+    // Desenha pequenos LEDs de exemplo
+    int exampleY = 125;
+    unsigned long currentMillis = millis(); // Usar variável local
+    
+    for(int i = 0; i < 8; i++) {
+        int ledX = SCREEN_WIDTH / 2 - 35 + i * 10;
+        int brightness = map(LED_BRIGHTNESS, 5, 255, 30, 255);
+        
+        // Corrigir o cálculo para evitar double
+        int timeFactor = currentMillis / 500;
+        float phase = timeFactor + i * 0.5;
+        int ledBrightness = (int)(brightness * (0.5 + 0.5 * sin(phase)));
+        
+        // Usar min() com valores int
+        int r = min(255, (int)(ledBrightness * 0.8));
+        int g = min(255, (int)(ledBrightness * 0.6));
+        int b = ledBrightness;
+        
+        // Aplicar limites
+        r = (r > 255) ? 255 : r;
+        g = (g > 255) ? 255 : g;
+        b = (b > 255) ? 255 : b;
+        
+        uint16_t ledColor = tft.color565(r, g, b);
+        
+        tft.fillCircle(ledX, exampleY, 3, ledColor);
+        tft.drawCircle(ledX, exampleY, 3, PANEL_COLOR);
+    }
+    
+    // 7. INSTRUÇÕES
     tft.setTextColor(ACCENT_COLOR);
-    tft.drawString("Gire encoder para ajustar", SCREEN_WIDTH / 2, 115);
-    tft.drawString("Encoder: Voltar ao menu", SCREEN_WIDTH / 2, 130);
+    tft.setTextDatum(BC_DATUM);
+    tft.drawString("Gire: Ajustar  |  Click: Salvar e Sair", SCREEN_WIDTH / 2, SCREEN_HEIGHT - 5);
 }
 
 void drawBatteryInfoScreen() {
-    tft.fillScreen(MENU_BG_COLOR);
+    tft.fillScreen(BACKGROUND_COLOR);
     
-    // Cabecalho
-    tft.fillRect(0, 0, SCREEN_WIDTH, 22, PRIMARY_COLOR);
+    // 1. CABEÇALHO COM ÍCONE DE BATERIA
+    tft.fillRect(0, 0, SCREEN_WIDTH, 28, PRIMARY_COLOR);
     tft.setTextColor(BACKGROUND_COLOR);
     tft.setTextSize(1);
     tft.setTextDatum(MC_DATUM);
-    tft.drawString("INFORMACOES BATERIA", SCREEN_WIDTH / 2, 11);
     
-    // Status
-    tft.setTextColor(TEXT_COLOR);
-    tft.setTextDatum(TL_DATUM);
-    tft.drawString("Status:", 10, 35);
+    // Desenha ícone de bateria ao lado do texto
+    int batteryIconX = SCREEN_WIDTH / 2 - 40;
+    tft.drawRect(batteryIconX, 10, 20, 12, BACKGROUND_COLOR);
+    tft.fillRect(batteryIconX + 20, 13, 3, 6, BACKGROUND_COLOR);
+    
+    // Texto do cabeçalho
+    tft.drawString("INFORMACOES BATERIA", SCREEN_WIDTH / 2, 14);
+    
+    // 2. STATUS PRINCIPAL EM DESTAQUE
+    tft.setTextSize(2);
+    tft.setTextDatum(MC_DATUM);
     
     if(isUsbConnected) {
         tft.setTextColor(WARNING_COLOR);
-        tft.drawString("USB CONECTADO", 50, 35);
+        tft.drawString("USB CONECTADO", SCREEN_WIDTH / 2, 45);
     } else {
         tft.setTextColor(SUCCESS_COLOR);
-        tft.drawString("MODO BATERIA", 50, 35);
+        tft.drawString("MODO BATERIA", SCREEN_WIDTH / 2, 45);
     }
     
-    // Dados
+    // 3. DADOS NUMÉRICOS EM DUAS COLUNAS
+    tft.setTextSize(1);
+    tft.setTextDatum(TL_DATUM);
+    
+    // Coluna esquerda
+    tft.setTextColor(SECONDARY_COLOR);
+    tft.drawString("Tensao:", 15, 65);
     tft.setTextColor(TEXT_COLOR);
-    tft.drawString("Tensao:", 10, 55);
-    tft.drawString(String(batteryVoltage, 2) + " V", 70, 55);
+    tft.drawString(String(batteryVoltage, 2) + " V", 70, 65);
     
-    tft.drawString("Porcentagem:", 10, 75);
+    tft.setTextColor(SECONDARY_COLOR);
+    tft.drawString("Porcentagem:", 15, 80);
     tft.setTextColor(batteryPercentage > 20 ? SUCCESS_COLOR : ERROR_COLOR);
-    tft.drawString(String(batteryPercentage) + " %", 90, 75);
+    tft.drawString(String(batteryPercentage) + " %", 90, 80);
     
-    // Barra visual grande
-    int battWidth = 160;
+    // Coluna direita
+    tft.setTextColor(SECONDARY_COLOR);
+    tft.drawString("Pino CE:", SCREEN_WIDTH / 2 + 15, 65);
+    tft.setTextColor(TEXT_COLOR);
+    tft.drawString(isUsbConnected ? "HIGH" : "LOW", SCREEN_WIDTH / 2 + 70, 65);
+    
+    tft.setTextColor(SECONDARY_COLOR);
+    tft.drawString("Carregando:", SCREEN_WIDTH / 2 + 15, 80);
+    tft.setTextColor(isCharging ? WARNING_COLOR : TEXT_COLOR);
+    tft.drawString(isCharging ? "SIM" : "NAO", SCREEN_WIDTH / 2 + 85, 80);
+    
+    // 4. BARRA DE BATERIA GRANDE COM STATUS
+    int battWidth = 200;
     int battHeight = 30;
     int battX = (SCREEN_WIDTH - battWidth) / 2;
-    int battY = 95;
+    int battY = 100;
     
-    // Moldura
+    // Moldura da bateria
     tft.drawRect(battX, battY, battWidth, battHeight, TEXT_COLOR);
-    tft.fillRect(battX + battWidth, battY + 8, 5, 14, TEXT_COLOR);
+    tft.fillRect(battX + battWidth, battY + 10, 5, 10, TEXT_COLOR);
     
-    // Preenchimento
+    // Preenchimento colorido baseado na porcentagem
     int fillWidth = map(batteryPercentage, 0, 100, 0, battWidth - 2);
-    uint16_t fillColor = batteryPercentage > 60 ? SUCCESS_COLOR : 
-                        batteryPercentage > 20 ? WARNING_COLOR : ERROR_COLOR;
+    
+    // Escolhe cor baseado na porcentagem
+    uint16_t fillColor;
+    if(batteryPercentage >= 60) {
+        fillColor = SUCCESS_COLOR; // Verde
+    } else if(batteryPercentage >= 30) {
+        fillColor = WARNING_COLOR; // Laranja
+    } else if(batteryPercentage >= 15) {
+        fillColor = TFT_YELLOW;    // Amarelo
+    } else {
+        fillColor = ERROR_COLOR;   // Vermelho
+    }
     
     tft.fillRect(battX + 1, battY + 1, fillWidth, battHeight - 2, fillColor);
     
-    // Status carga
-    tft.setTextColor(TEXT_COLOR);
+    // Texto dentro da barra (se houver espaço)
+    if(fillWidth > 30) {
+        tft.setTextColor(BACKGROUND_COLOR);
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextSize(1);
+        tft.drawString(String(batteryPercentage) + "%", battX + fillWidth/2, battY + battHeight/2);
+    }
+    
+    // 5. STATUS DO TP4056 (CONTROLE DE CARGA)
+    int statusY = battY + battHeight + 15;
+    
+    tft.setTextColor(SECONDARY_COLOR);
+    tft.setTextDatum(TC_DATUM);
+    tft.drawString("Controle de Carga TP4056", SCREEN_WIDTH / 2, statusY);
+    
     tft.setTextDatum(MC_DATUM);
-    tft.drawString("Controle de Carga:", SCREEN_WIDTH / 2, 135);
+    tft.setTextSize(1);
     
     if(isUsbConnected) {
         tft.setTextColor(WARNING_COLOR);
-        tft.drawString("BLOQUEADO (CE HIGH)", SCREEN_WIDTH / 2, 150);
+        tft.drawString("BLOQUEADO (CE = HIGH)", SCREEN_WIDTH / 2, statusY + 15);
+        tft.setTextColor(TEXT_COLOR);
+        tft.drawString("Carregamento desativado", SCREEN_WIDTH / 2, statusY + 30);
     } else {
         tft.setTextColor(SUCCESS_COLOR);
-        tft.drawString("HABILITADO (CE LOW)", SCREEN_WIDTH / 2, 150);
+        tft.drawString("HABILITADO (CE = LOW)", SCREEN_WIDTH / 2, statusY + 15);
+        tft.setTextColor(TEXT_COLOR);
+        tft.drawString("Carregamento ativo", SCREEN_WIDTH / 2, statusY + 30);
     }
     
-    // Voltar
-    tft.setTextColor(TEXT_COLOR);
-    tft.drawString("Encoder: Voltar", SCREEN_WIDTH / 2, 170);
+    // 6. LEGENDA DE STATUS
+    tft.setTextColor(ACCENT_COLOR);
+    tft.setTextDatum(BC_DATUM);
+    tft.drawString("Encoder: Voltar ao Menu", SCREEN_WIDTH / 2, SCREEN_HEIGHT - 5);
+}
+
+// =========================================================================
+// === FUNÇÕES PARA PERSISTÊNCIA DO BRILHO ================================
+// =========================================================================
+
+void loadBrightnessFromPrefs() {
+    preferences.begin(PREFS_BRIGHTNESS_KEY, true); // Modo leitura com chave separada
+    LED_BRIGHTNESS = preferences.getInt("brightness", 150);
+    preferences.end();
+    
+    // Garante que está dentro dos limites
+    LED_BRIGHTNESS = constrain(LED_BRIGHTNESS, 5, 255);
+    FastLED.setBrightness(LED_BRIGHTNESS);
+    
+    Serial.println("Brilho carregado: " + String(LED_BRIGHTNESS));
+}
+
+void saveBrightnessToPrefs() {
+    preferences.begin(PREFS_BRIGHTNESS_KEY, false); // Modo escrita com chave separada
+    preferences.putInt("brightness", LED_BRIGHTNESS);
+    preferences.end();
+    
+    Serial.println("Brilho salvo: " + String(LED_BRIGHTNESS));
 }
 
 void drawLedEffectsScreen() {
-    tft.fillScreen(MENU_BG_COLOR);
+    static int lastLedEffectsSelection = -1;
     
-    // 1. Cabecalho mais compacto para ganhar espaço
-    tft.fillRect(0, 0, SCREEN_WIDTH, 18, PRIMARY_COLOR);
-    tft.setTextColor(BACKGROUND_COLOR);
-    tft.setTextSize(1);
-    tft.setTextDatum(MC_DATUM);
-    tft.drawString("EFEITOS LEDs", SCREEN_WIDTH / 2, 9);
+    bool fullRedraw = (lastLedEffectsSelection == -1);
+    lastLedEffectsSelection = menuSelection;
+    
+    if(fullRedraw) {
+        tft.fillScreen(MENU_BG_COLOR);
+        
+        // 1. Cabeçalho mais compacto
+        tft.fillRect(0, 0, SCREEN_WIDTH, 18, PRIMARY_COLOR);
+        tft.setTextColor(BACKGROUND_COLOR);
+        tft.setTextSize(1);
+        tft.setTextDatum(MC_DATUM);
+        tft.drawString("EFEITOS LEDs", SCREEN_WIDTH / 2, 9);
+        
+        // 3. Instrucoes fixadas
+        tft.setTextColor(ACCENT_COLOR);
+        tft.setTextDatum(BC_DATUM);
+        tft.drawString("Gire: Sel. | Click: OK", SCREEN_WIDTH / 2, 130);
+    }
     
     // 2. Lista de efeitos (7 itens)
     String effects[] = {"Arco-Iris", "Piscante", "Onda Azul", "Fogo", "Estrelas", "Desligar", "Voltar"};
@@ -681,13 +889,16 @@ void drawLedEffectsScreen() {
     
     // Ajuste de layout para tela de 1.14"
     int startY = 25;      // Onde começa o primeiro item
-    int rowHeight = 14;   // Altura de cada linha (reduzido de 18)
+    int rowHeight = 14;   // Altura de cada linha
     
     for(int i = 0; i < effectsCount; i++) {
         int yPos = startY + (i * rowHeight);
         
+        // Limpa apenas a área deste item
+        tft.fillRect(5, yPos - 2, SCREEN_WIDTH - 10, 12, MENU_BG_COLOR);
+        
         if(i == menuSelection) {
-            // Retângulo de seleção um pouco mais fino
+            // Retângulo de seleção
             tft.fillRect(5, yPos - 2, SCREEN_WIDTH - 10, 12, HIGHLIGHT_COLOR);
             tft.setTextColor(BACKGROUND_COLOR);
         } else {
@@ -703,12 +914,6 @@ void drawLedEffectsScreen() {
             tft.drawString(">", SCREEN_WIDTH - 10, yPos);
         }
     }
-    
-    // 3. Instrucoes fixadas no final da tela (Considerando 135px de altura total)
-    tft.setTextColor(ACCENT_COLOR);
-    tft.setTextDatum(BC_DATUM); 
-    // Usando SCREEN_HEIGHT ou 130 para garantir que apareça no fim
-    tft.drawString("Gire: Sel. | Click: OK", SCREEN_WIDTH / 2, 130);
 }
 
 void drawAdvancedSettings() {
@@ -742,48 +947,114 @@ void drawAdvancedSettings() {
 }
 
 void drawAboutDeviceScreen() {
-    tft.fillScreen(MENU_BG_COLOR);
+    // 1. FUNDO COM GRADIENTE OU TEXTURA
+    for(int y = 0; y < SCREEN_HEIGHT; y++) {
+        // Gradiente suave de preto para azul escuro
+        uint16_t lineColor = tft.color565(0, 0, y / 8);
+        tft.drawFastHLine(0, y, SCREEN_WIDTH, lineColor);
+    }
     
-    // Cabecalho
-    tft.fillRect(0, 0, SCREEN_WIDTH, 22, PRIMARY_COLOR);
-    tft.setTextColor(BACKGROUND_COLOR);
+    // Adiciona padrão de pontos sutis
+    for(int i = 0; i < 30; i++) {
+        int x = random(SCREEN_WIDTH);
+        int y = random(SCREEN_HEIGHT);
+        tft.drawPixel(x, y, PANEL_COLOR);
+    }
+    
+    // 2. MOLDURA/CARTÃO PRINCIPAL
+    int cardX = 10;
+    int cardY = 10;
+    int cardWidth = SCREEN_WIDTH - 20;
+    int cardHeight = SCREEN_HEIGHT - 20;
+    
+    // Cartão com sombra e borda
+    tft.fillRoundRect(cardX + 2, cardY + 2, cardWidth, cardHeight, 8, 0x3186);
+    tft.fillRoundRect(cardX, cardY, cardWidth, cardHeight, 8, BACKGROUND_COLOR);
+    tft.drawRoundRect(cardX, cardY, cardWidth, cardHeight, 8, PRIMARY_COLOR);
+    
+    // 3. CABEÇALHO DENTRO DO CARTÃO
+    tft.setTextColor(PRIMARY_COLOR);
     tft.setTextSize(1);
-    tft.setTextDatum(MC_DATUM);
-    tft.drawString("SOBRE DISPOSITIVO", SCREEN_WIDTH / 2, 11);
+    tft.setTextDatum(TC_DATUM);
+    tft.drawString("ESP32 STREAM DECK", SCREEN_WIDTH / 2, cardY + 15);
     
-    // Informacoes do dispositivo
+    // Linha decorativa abaixo do título
+    tft.drawFastHLine(cardX + 20, cardY + 28, cardWidth - 40, SECONDARY_COLOR);
+    
+    // 4. INFORMAÇÕES PRINCIPAIS - COLUNA ESQUERDA
+    int infoX = cardX + 15;
+    int infoY = cardY + 40;
+    int lineHeight = 16;
+    
+    tft.setTextSize(1);
+    tft.setTextDatum(TL_DATUM);
+    
+    // Modelo/Placa
+    tft.setTextColor(SECONDARY_COLOR);
+    tft.drawString("Modelo:", infoX, infoY);
+    tft.setTextColor(TEXT_COLOR);
+    tft.drawString("ESP32-S3", infoX + 50, infoY);
+    
+    // Firmware
+    tft.setTextColor(SECONDARY_COLOR);
+    tft.drawString("Firmware:", infoX, infoY + lineHeight);
+    tft.setTextColor(ACCENT_COLOR);
+    tft.drawString(FIRMWARE_VERSION, infoX + 50, infoY + lineHeight);
+    
+    // CPU
+    tft.setTextColor(SECONDARY_COLOR);
+    tft.drawString("CPU:", infoX, infoY + lineHeight * 2);
+    tft.setTextColor(TEXT_COLOR);
+    tft.drawString("Xtensa LX7", infoX + 50, infoY + lineHeight * 2);
+    
+    // 5. INFORMAÇÕES PRINCIPAIS - COLUNA DIREITA
+    int infoX2 = SCREEN_WIDTH / 2;
+    
+    // Memória Flash
+    tft.setTextColor(SECONDARY_COLOR);
+    tft.drawString("Flash:", infoX2, infoY);
+    tft.setTextColor(TEXT_COLOR);
+    tft.drawString("8MB", infoX2 + 35, infoY);
+    
+    // RAM
+    tft.setTextColor(SECONDARY_COLOR);
+    tft.drawString("RAM:", infoX2, infoY + lineHeight);
+    tft.setTextColor(TEXT_COLOR);
+    tft.drawString("512KB", infoX2 + 35, infoY + lineHeight);
+    
+    // Display
+    tft.setTextColor(SECONDARY_COLOR);
+    tft.drawString("Display:", infoX2, infoY + lineHeight * 2);
+    tft.setTextColor(TEXT_COLOR);
+    tft.drawString("1.14\" IPS", infoX2 + 50, infoY + lineHeight * 2);
+    
+    // 6. SEÇÃO DE DESENVOLVEDOR
+    tft.drawFastHLine(cardX + 20, infoY + lineHeight * 3 + 10, cardWidth - 40, PANEL_COLOR);
+    
+    tft.setTextColor(PRIMARY_COLOR);
+    tft.setTextDatum(TC_DATUM);
+    tft.drawString("DESENVOLVEDOR", SCREEN_WIDTH / 2, infoY + lineHeight * 3 + 20);
+    
+    tft.setTextColor(TEXT_COLOR);
+    tft.drawString(DEVELOPER, SCREEN_WIDTH / 2, infoY + lineHeight * 3 + 35);
+    
+    // 7. CONTATO/GITHUB
+    tft.setTextColor(SECONDARY_COLOR);
+    tft.setTextSize(1);
+    
+    // Quebra o GitHub em duas linhas se necessário
+    String githubLine1 = "github.com/";
+    String githubLine2 = "KanekiZLF";
+    
+    tft.drawString(githubLine1, SCREEN_WIDTH / 2, infoY + lineHeight * 3 + 50);
+    tft.drawString(githubLine2, SCREEN_WIDTH / 2, infoY + lineHeight * 3 + 62);
+    
+    // 8. INSTRUÇÃO NO RODAPÉ DO CARTÃO
+    tft.drawFastHLine(cardX + 10, cardY + cardHeight - 20, cardWidth - 20, SECONDARY_COLOR);
+    
     tft.setTextColor(ACCENT_COLOR);
     tft.setTextSize(1);
-    tft.setTextDatum(MC_DATUM);
-    tft.drawString("ESP32 STREAM DECK", SCREEN_WIDTH / 2, 40);
-    
-    tft.setTextColor(TEXT_COLOR);
-    tft.drawString(FIRMWARE_VERSION, SCREEN_WIDTH / 2, 60);
-    
-    // Separador
-    tft.drawFastHLine(20, 75, SCREEN_WIDTH - 40, SECONDARY_COLOR);
-    
-    // Especificacoes
-    tft.setTextDatum(TL_DATUM);
-    tft.drawString("Especificacoes:", 20, 85);
-    tft.drawString("• 16 Botoes Programaveis", 25, 100);
-    tft.drawString("• 16 LEDs RGB WS2812B", 25, 115);
-    tft.drawString("• Wi-Fi + USB Serial", 25, 130);
-    tft.drawString("• Monitor de Bateria", 25, 145);
-    
-    // Desenvolvedor
-    tft.setTextColor(PRIMARY_COLOR);
-    tft.drawString("Desenvolvedor:", 20, 160);
-    tft.setTextColor(TEXT_COLOR);
-    tft.drawString(DEVELOPER, 25, 175);
-    
-    // GitHub
-    tft.setTextColor(SECONDARY_COLOR);
-    tft.drawString(GITHUB, SCREEN_WIDTH / 2, 195);
-    
-    // Voltar
-    tft.setTextColor(TEXT_COLOR);
-    tft.drawString("Encoder: Voltar", SCREEN_WIDTH / 2, 215);
+    tft.drawString("Pressione ENCODER para voltar", SCREEN_WIDTH / 2, cardY + cardHeight - 10);
 }
 
 // =========================================================================
@@ -808,6 +1079,9 @@ void handleEncoderButton() {
         unsigned long now = millis();
         
         if(now - lastEncoderBtnPress > ENCODER_DEBOUNCE_DELAY) {
+            // Salva estado anterior
+            SystemState previousState = currentState;
+            
             // NÃO altera LEDs quando entra no menu
             // Apenas processa a navegação
             
@@ -816,6 +1090,7 @@ void handleEncoderButton() {
                     currentState = STATE_SETTINGS_MENU;
                     menuSelection = 0;
                     menuScrollOffset = 0;
+                    resetRenderStates();  // <-- RESETA ESTADOS DE RENDER
                     drawSettingsMenu();
                     Serial.println("Navegacao: Tela Principal -> Menu Config");
                     break;
@@ -825,32 +1100,38 @@ void handleEncoderButton() {
                         case 0:  // Wi-Fi
                             currentState = STATE_WIFI_CONFIG_MENU;
                             wifiMenuSelection = 0;
+                            resetRenderStates();  // <-- RESETA ESTADOS DE RENDER
                             drawWifiConfigMenu();
                             Serial.println("Navegacao: Menu -> Config Wi-Fi");
                             break;
                         case 1:  // Brilho
                             currentState = STATE_BRIGHTNESS_CONFIG;
+                            resetRenderStates();  // <-- RESETA ESTADOS DE RENDER
                             drawBrightnessConfigScreen();
                             Serial.println("Navegacao: Menu -> Brilho LEDs");
                             break;
                         case 2:  // Efeitos
                             currentState = STATE_LED_EFFECTS;
                             menuSelection = 0;
+                            resetRenderStates();  // <-- RESETA ESTADOS DE RENDER
                             drawLedEffectsScreen();
                             Serial.println("Navegacao: Menu -> Efeitos LEDs");
                             break;
                         case 3:  // Bateria
                             currentState = STATE_BATTERY_INFO;
+                            resetRenderStates();  // <-- RESETA ESTADOS DE RENDER
                             drawBatteryInfoScreen();
                             Serial.println("Navegacao: Menu -> Info Bateria");
                             break;
                         case 4:  // Avancado
                             currentState = STATE_ADVANCED_SETTINGS;
+                            resetRenderStates();  // <-- RESETA ESTADOS DE RENDER
                             drawAdvancedSettings();
                             Serial.println("Navegacao: Menu -> Avancado");
                             break;
                         case 5:  // Sobre Dispositivo
                             currentState = STATE_ABOUT_DEVICE;
+                            resetRenderStates();  // <-- RESETA ESTADOS DE RENDER
                             drawAboutDeviceScreen();
                             Serial.println("Navegacao: Menu -> Sobre Dispositivo");
                             break;
@@ -860,6 +1141,7 @@ void handleEncoderButton() {
                             break;
                         case 7:  // Voltar
                             currentState = STATE_MAIN;
+                            resetRenderStates();  // <-- RESETA ESTADOS DE RENDER
                             drawMainScreen();
                             Serial.println("Navegacao: Menu -> Tela Principal");
                             break;
@@ -871,15 +1153,20 @@ void handleEncoderButton() {
                         case 0:  // Limpar credenciais
                             clearWiFiCredentials();
                             currentState = STATE_SETTINGS_MENU;
+                            menuSelection = 0;
+                            resetRenderStates();  // <-- RESETA ESTADOS DE RENDER
                             drawSettingsMenu();
                             Serial.println("Credenciais Wi-Fi limpas");
                             break;
                         case 1:  // Configurar nova rede
                             currentState = STATE_WIFI_CONFIG_PORTAL;
+                            resetRenderStates();  // <-- RESETA ESTADOS DE RENDER
                             resetWiFiCredentials();
                             break;
                         case 2:  // Voltar
                             currentState = STATE_SETTINGS_MENU;
+                            menuSelection = 0;
+                            resetRenderStates();  // <-- RESETA ESTADOS DE RENDER
                             drawSettingsMenu();
                             break;
                     }
@@ -892,40 +1179,62 @@ void handleEncoderButton() {
                     currentState = STATE_SETTINGS_MENU;
                     menuSelection = 0;
                     menuScrollOffset = 0;
+                    resetRenderStates();  // <-- RESETA ESTADOS DE RENDER
                     drawSettingsMenu();
                     break;
                     
                 case STATE_LED_EFFECTS:
-                    if(!effectActive) {
-                        effectActive = true;
-                        manualControl = true;
-                        
-                        switch(menuSelection) {
-                            case 0: currentEffect = "RAINBOW"; break;
-                            case 1: currentEffect = "BLINK"; break;
-                            case 2: currentEffect = "WAVE_BLUE"; break;
-                            case 3: currentEffect = "FIRE"; break;
-                            case 4: currentEffect = "TWINKLE"; break;
-                            case 5: 
-                                effectActive = false;
-                                manualControl = false;
-                                clearAllLEDs();
-                                break;
-                            case 6:  // Voltar
-                                currentState = STATE_SETTINGS_MENU;
-                                drawSettingsMenu();
-                                break;
-                        }
-                        
-                        if(effectActive) {
-                            Serial.println("Efeito ativado via encoder: " + currentEffect);
-                        }
-                    } else {
+                    // Se selecionou "Voltar", sempre volta
+                    if(menuSelection == 6) {  // "Voltar" é o item 6
+                        currentState = STATE_SETTINGS_MENU;
+                        // NÃO desativa o efeito aqui! Apenas muda de tela
+                        menuSelection = 2;  // Volta para o item "Efeitos LEDs"
+                        resetRenderStates();
+                        drawSettingsMenu();
+                        break;
+                    }
+                    
+                    // Se selecionou "Desligar"
+                    if(menuSelection == 5) {  // "Desligar" é o item 5
                         effectActive = false;
                         manualControl = false;
                         clearAllLEDs();
-                        Serial.println("Efeito desativado via encoder");
+                        saveEffectToPrefs("NONE"); // Salva que não tem efeito
+                        break;
                     }
+                    
+                    // Para os efeitos: ativa o efeito selecionado
+                    effectActive = true;
+                    manualControl = true;
+                    
+                    switch(menuSelection) {
+                        case 0: 
+                            currentEffect = "RAINBOW"; 
+                            saveEffectToPrefs("RAINBOW");
+                            break;
+                        case 1: 
+                            currentEffect = "BLINK"; 
+                            saveEffectToPrefs("BLINK");
+                            break;
+                        case 2: 
+                            currentEffect = "WAVE_BLUE"; 
+                            saveEffectToPrefs("WAVE_BLUE");
+                            break;
+                        case 3: 
+                            currentEffect = "FIRE"; 
+                            saveEffectToPrefs("FIRE");
+                            break;
+                        case 4: 
+                            currentEffect = "TWINKLE"; 
+                            saveEffectToPrefs("TWINKLE");
+                            break;
+                    }
+                    
+                    // ATUALIZA O EFEITO IMEDIATAMENTE
+                    effectTimer = millis();
+                    updateEffect();
+                    
+                    Serial.println("Efeito ativado e salvo: " + currentEffect);
                     break;
             }
             
@@ -935,7 +1244,6 @@ void handleEncoderButton() {
     
     encoderBtnLastState = btnState;
 }
-
 void handleEncoderRotation() {
     int currentStateEncoder = digitalRead(ENCODER_CLK_PIN);
     
@@ -968,9 +1276,16 @@ void handleEncoderRotation() {
             }
             
             if(LED_BRIGHTNESS != oldBrightness) {
+                // Aplica o novo brilho
                 FastLED.setBrightness(LED_BRIGHTNESS);
                 FastLED.show();
+                
+                // Atualiza a tela
                 drawBrightnessConfigScreen();
+                
+                // Salva nas preferências
+                saveBrightnessToPrefs();
+                
                 Serial.println("Brilho ajustado: " + String(LED_BRIGHTNESS));
             }
         }
@@ -987,8 +1302,18 @@ void handleEncoderRotation() {
     lastEncoderState = currentStateEncoder;
 }
 
+void resetRenderStates() {
+    lastMenuSelection = -1;
+    lastMenuScrollOffset = -1;
+    lastWifiMenuSelection = -1;
+}
+
 // =========================================================================
 // === VERIFICAÇÃO DE CONEXÃO WI-FI =======================================
+// =========================================================================
+
+// =========================================================================
+// === VERIFICAÇÃO DE CONEXÃO WI-FI - ATUALIZADA ==========================
 // =========================================================================
 
 void checkWiFiConnection() {
@@ -998,18 +1323,13 @@ void checkWiFiConnection() {
     if(lastWiFiConnected && !wifiConnected) {
         Serial.println("⚠️ Wi-Fi desconectado!");
         
-        // Se estava conectado via Wi-Fi, muda para desconectado
+        // Mostra feedback visual
         if(activeProtocol == WIFI) {
             activeProtocol = NONE;
+            showConnectionFeedback(NONE); // Mostra feedback vermelho
             Serial.println("Protocolo alterado: Wi-Fi -> Nenhum");
-            
-            // Atualiza tela se estiver na tela principal
-            if(currentState == STATE_MAIN) {
-                drawMainScreen();
-            }
         }
         
-        // Para cliente Wi-Fi se estiver conectado
         if(client.connected()) {
             client.stop();
             Serial.println("Cliente Wi-Fi desconectado");
@@ -1020,6 +1340,12 @@ void checkWiFiConnection() {
         Serial.println("✅ Wi-Fi reconectado!");
         Serial.print("IP: ");
         Serial.println(WiFi.localIP().toString());
+        
+        // Mostra feedback visual
+        if(activeProtocol == NONE) {
+            activeProtocol = WIFI;
+            showConnectionFeedback(WIFI); // Mostra feedback verde
+        }
         
         // Reinicia servidores
         serverTCP.begin();
@@ -1176,34 +1502,62 @@ void setStatusLEDs() {
     }
 }
 
+// =========================================================================
+// === CONTROLE DOS LEDs - ATUALIZADA =====================================
+// =========================================================================
+
 void updateLEDs() {
     updateLedFeedback();
     
-    // Se tem efeito ativo, apenas atualiza o efeito
+    // 1. Primeiro verifica se está em modo feedback
+    if(isInFeedbackMode) {
+        if(millis() - feedbackStartTime > feedbackDuration) {
+            if(shouldRestoreEffect && savedEffect != "NONE") {
+                restoreSavedEffect();
+            } else {
+                isInFeedbackMode = false;
+            }
+        }
+        return;
+    }
+    
+    // 2. Se tem efeito ativo, atualiza
     if(effectActive) {
         updateEffect();
         return;
     }
     
-    // Não faz nada durante controle manual ou config portal
+    // 3. Não faz nada durante controle manual ou config portal
     if(manualControl || wifiConfigMode || ledFeedbackActive) {
         return;
     }
     
-    static unsigned long lastStatusUpdate = 0;
-    if(millis() - lastStatusUpdate > 200) {
-        setStatusLEDs();
-        lastStatusUpdate = millis();
+    // 4. Se não tem efeito ativo, aplica máscara se houver LEDs fixos
+    bool hasFixedLeds = false;
+    for(int i = 0; i < NUM_LEDS; i++) {
+        if(ledMask[i]) {
+            hasFixedLeds = true;
+            break;
+        }
+    }
+    
+    if(hasFixedLeds) {
+        // Aplica apenas as cores fixas
+        applyLedMask();
+        FastLED.show();
+    } else {
+        // Nenhum LED fixo, desliga todos
+        clearAllLEDs();
     }
 }
 
+
 // =========================================================================
-// === FUNÇÕES DE PROCESSAMENTO DE COMANDOS LED ===========================
+// === FUNÇÕES DE PROCESSAMENTO DE COMANDOS LED - ATUALIZADA ==============
 // =========================================================================
 
 void processIndividualLedCommand(const String& command) {
     manualControl = true;
-    effectActive = false;
     
     int firstColon = command.indexOf(':');
     int secondColon = command.indexOf(':', firstColon + 1);
@@ -1211,6 +1565,15 @@ void processIndividualLedCommand(const String& command) {
     if(secondColon != -1) {
         int ledIndex = command.substring(firstColon + 1, secondColon).toInt();
         String colorStr = command.substring(secondColon + 1);
+        
+        // Verifica se é comando para remover cor fixa
+        if(colorStr == "OFF" || colorStr == "RESET") {
+            if(ledIndex >= 0 && ledIndex < NUM_LEDS) {
+                ledMask[ledIndex] = false; // Apenas desativa na memória
+                Serial.println("LED " + String(ledIndex) + " liberado da cor fixa");
+                return;
+            }
+        }
         
         if(colorStr.startsWith("#")) {
             colorStr = colorStr.substring(1);
@@ -1224,12 +1587,17 @@ void processIndividualLedCommand(const String& command) {
         );
         
         if(ledIndex >= 0 && ledIndex < NUM_LEDS) {
+            // Define cor fixa apenas em memória
+            ledMask[ledIndex] = true;
+            ledFixedColors[ledIndex] = ledColor;
+            
+            // Aplica imediatamente
             leds[ledIndex] = ledColor;
             FastLED.show();
             
             Serial.print("LED ");
             Serial.print(ledIndex);
-            Serial.print(" definido para #");
+            Serial.print(" com cor fixa: #");
             Serial.println(colorStr);
         }
     }
@@ -1239,19 +1607,61 @@ void processAllLedCommand(const String& command) {
     String subCmd = command.substring(8);
     
     if(subCmd == "ON") {
+        // Liga todos os LEDs em branco
         fill_solid(leds, NUM_LEDS, CRGB::White);
         FastLED.show();
         effectActive = false;
         manualControl = true;
+        
+        // Limpa máscara (apenas em memória)
+        for(int i = 0; i < NUM_LEDS; i++) {
+            ledMask[i] = false;
+        }
+        
         Serial.println("Todos LEDs LIGADOS (branco)");
     }
     else if(subCmd == "OFF") {
+        // Desliga todos os LEDs
         clearAllLEDs();
         effectActive = false;
         manualControl = false;
+        
+        // Limpa máscara (apenas em memória)
+        for(int i = 0; i < NUM_LEDS; i++) {
+            ledMask[i] = false;
+        }
+        
         Serial.println("Todos LEDs DESLIGADOS");
     }
+    else if(subCmd == "CLEAR_MASK") {
+        // Limpa máscara de LEDs fixos
+        for(int i = 0; i < NUM_LEDS; i++) {
+            ledMask[i] = false;
+        }
+        Serial.println("Máscara de LEDs limpa");
+    }
+    else if(subCmd == "SHOW_MASK") {
+        // Mostra status atual da máscara (apenas em memória)
+        Serial.println("\n═══════════════════════════════════════");
+        Serial.println("    STATUS DA MÁSCARA DE LEDs (MEMÓRIA)");
+        Serial.println("═══════════════════════════════════════");
+        for(int i = 0; i < NUM_LEDS; i++) {
+            if(ledMask[i]) {
+                Serial.print("  LED ");
+                Serial.print(i);
+                Serial.print(": Cor fixa (");
+                Serial.print(ledFixedColors[i].r);
+                Serial.print(",");
+                Serial.print(ledFixedColors[i].g);
+                Serial.print(",");
+                Serial.print(ledFixedColors[i].b);
+                Serial.println(")");
+            }
+        }
+        Serial.println("═══════════════════════════════════════");
+    }
     else {
+        // Ativa um efeito
         effectActive = true;
         currentEffect = subCmd;
         effectTimer = millis();
@@ -1276,17 +1686,23 @@ void updateEffect() {
     if(!effectActive) return;
     if(millis() - effectTimer < 50) return;
     
+    // Salva as cores dos LEDs mascarados antes de atualizar
+    CRGB savedMaskedColors[NUM_LEDS];
+    for(int i = 0; i < NUM_LEDS; i++) {
+        if(ledMask[i]) {
+            savedMaskedColors[i] = leds[i];
+        }
+    }
+    
     if(currentEffect == "RAINBOW") {
         static uint8_t hue = 0;
         fill_rainbow(leds, NUM_LEDS, hue, 255 / NUM_LEDS);
-        FastLED.show();
         hue += 5;
     } 
     else if(currentEffect == "BLINK") {
         static bool blinkState = false;
         blinkState = !blinkState;
         fill_solid(leds, NUM_LEDS, blinkState ? CRGB::White : CRGB::Black);
-        FastLED.show();
     } 
     else if(currentEffect == "WAVE_BLUE") {
         static uint8_t offset = 0;
@@ -1294,7 +1710,6 @@ void updateEffect() {
             uint8_t brightness = sin8(i * 32 + offset);
             leds[i] = CRGB(0, 0, brightness);
         }
-        FastLED.show();
         offset += 8;
     } 
     else if(currentEffect == "FIRE") {
@@ -1302,7 +1717,6 @@ void updateEffect() {
             int heat = random8(50, 255);
             leds[i] = HeatColor(heat);
         }
-        FastLED.show();
     } 
     else if(currentEffect == "TWINKLE") {
         static uint8_t sparkle[NUM_LEDS];
@@ -1317,11 +1731,19 @@ void updateEffect() {
                 leds[i] = CRGB::Black;
             }
         }
-        FastLED.show();
     }
     
+    // RESTAURA as cores dos LEDs mascarados após atualizar o efeito
+    for(int i = 0; i < NUM_LEDS; i++) {
+        if(ledMask[i]) {
+            leds[i] = savedMaskedColors[i];
+        }
+    }
+    
+    FastLED.show();
     effectTimer = millis();
 }
+
 
 // =========================================================================
 // === GERENCIAMENTO DA BATERIA ============================================
@@ -1398,6 +1820,7 @@ void updateBatteryDisplay() {
 // =========================================================================
 
 void initWiFi() {
+    preferences.begin(PREFS_KEY, true);
     String ssid = preferences.getString("ssid", "");
     String pass = preferences.getString("pass", "");
     
@@ -1424,7 +1847,6 @@ void initWiFi() {
             lastWiFiConnected = true;
         } else {
             Serial.println(" FALHA");
-            preferences.clear();
             lastWiFiConnected = false;
         }
     }
@@ -1541,66 +1963,377 @@ void checkSerialCommands() {
             processLedCommand(message);
         }
         else if(message == "CONNECTED") {
-            activeProtocol = USB;
-            manualControl = false;
-            if(currentState == STATE_MAIN) drawMainScreen();
-            Serial.println("Conectado via USB");
+            if(activeProtocol != USB) {
+                activeProtocol = USB;
+                showConnectionFeedback(USB); // Mostra feedback azul
+                if(currentState == STATE_MAIN) drawMainScreen();
+                Serial.println("Conectado via USB");
+            }
         } 
         else if(message == "DISCONNECT") {
-            if(client.connected()) {
-                activeProtocol = WIFI;
-            } else {
-                activeProtocol = NONE;
+            if(activeProtocol == USB) {
+                activeProtocol = client.connected() ? WIFI : NONE;
+                showConnectionFeedback(activeProtocol); // Mostra feedback apropriado
+                if(currentState == STATE_MAIN) drawMainScreen();
+                Serial.println("Desconectado do USB");
             }
-            manualControl = false;
-            if(currentState == STATE_MAIN) drawMainScreen();
-            Serial.println("Desconectado do USB");
         } 
         else if(message == "STATUS") {
-            Serial.println("\n=== STATUS DO SISTEMA ===");
-            Serial.println("Firmware: " + String(FIRMWARE_VERSION));
-            Serial.println("Estado: " + String(currentState));
-            Serial.println("Protocolo: " + String(activeProtocol == USB ? "USB" : 
-                                                    activeProtocol == WIFI ? "Wi-Fi" : "Nenhum"));
-            Serial.println("Brilho LEDs: " + String(LED_BRIGHTNESS));
-            Serial.println("Bateria: " + String(batteryPercentage) + "% (" + String(batteryVoltage, 1) + "V)");
-            Serial.println("USB Conectado: " + String(isUsbConnected ? "Sim" : "Nao"));
-            Serial.println("Carregando: " + String(isCharging ? "Sim" : "Nao"));
-            Serial.println("Wi-Fi: " + String(WiFi.status() == WL_CONNECTED ? "Conectado" : "Desconectado"));
+            Serial.println("\n═══════════════════════════════════════");
+            Serial.println("       ESP32 DECK - STATUS DO SISTEMA");
+            Serial.println("═══════════════════════════════════════");
+            Serial.println("FIRMWARE: " + String(FIRMWARE_VERSION));
+            Serial.println("DESENVOLVEDOR: " + String(DEVELOPER));
+            Serial.println("GITHUB: " + String(GITHUB));
+            Serial.println("═══════════════════════════════════════");
+            Serial.println("🎮 ESTADO DO SISTEMA:");
+            Serial.println("   • Estado atual: " + String(currentState));
+            Serial.println("   • Protocolo: " + String(activeProtocol == USB ? "USB ⚡" : 
+                                                      activeProtocol == WIFI ? "Wi-Fi 📶" : "Nenhum ⭕"));
+            Serial.println("═══════════════════════════════════════");
+            Serial.println("🔋 BATERIA:");
+            Serial.println("   • Porcentagem: " + String(batteryPercentage) + "%");
+            Serial.println("   • Tensão: " + String(batteryVoltage, 1) + "V");
+            Serial.println("   • USB Conectado: " + String(isUsbConnected ? "Sim ✅" : "Não ❌"));
+            Serial.println("   • Carregando: " + String(isCharging ? "Sim 🔌" : "Não ⚡"));
+            Serial.println("═══════════════════════════════════════");
+            Serial.println("🌐 REDE WI-FI:");
+            Serial.println("   • Status: " + String(WiFi.status() == WL_CONNECTED ? "Conectado ✅" : "Desconectado ❌"));
             if(WiFi.status() == WL_CONNECTED) {
-                Serial.println("IP: " + WiFi.localIP().toString());
+                Serial.println("   • SSID: " + WiFi.SSID());
+                Serial.println("   • IP: " + WiFi.localIP().toString());
             }
-            Serial.println("Desenvolvedor: " + String(DEVELOPER));
-            Serial.println("GitHub: " + String(GITHUB));
-            Serial.println("==========================");
+            Serial.println("═══════════════════════════════════════");
+            Serial.println("💡 CONFIGURAÇÕES LED:");
+            Serial.println("   • Brilho: " + String(LED_BRIGHTNESS) + "/255");
+            Serial.println("   • Efeito salvo: " + savedEffect);
+            Serial.println("   • Efeito ativo: " + String(effectActive ? currentEffect : "Nenhum"));
+            Serial.println("   • Modo manual: " + String(manualControl ? "Sim" : "Não"));
+            Serial.println("   • Feedback ativo: " + String(isInFeedbackMode ? "Sim" : "Não"));
+            Serial.println("═══════════════════════════════════════");
         }
         else if(message == "LED_HELP") {
-            Serial.println("\n=== COMANDOS LED DISPONIVEIS ===");
-            Serial.println("LED:0:FF0000      // LED 0 vermelho");
-            Serial.println("LED:1:00FF00      // LED 1 verde");
-            Serial.println("LED:2:0000FF      // LED 2 azul");
-            Serial.println("LED:3:FFFF00      // LED 3 amarelo");
-            Serial.println("LED:4:FF00FF      // LED 4 rosa");
-            Serial.println("LED:5:00FFFF      // LED 5 ciano");
-            Serial.println("ALL_LED:ON        // Liga todos branco");
-            Serial.println("ALL_LED:OFF       // Desliga todos");
-            Serial.println("ALL_LED:RAINBOW   // Efeito arco-iris");
-            Serial.println("ALL_LED:BLINK     // Efeito piscante");
-            Serial.println("ALL_LED:WAVE_BLUE // Onda azul");
-            Serial.println("ALL_LED:FIRE      // Efeito fogo");
-            Serial.println("ALL_LED:TWINKLE   // Efeito estrelas");
-            Serial.println("================================");
+            Serial.println("\n═══════════════════════════════════════");
+            Serial.println("         COMANDOS LED DISPONÍVEIS");
+            Serial.println("═══════════════════════════════════════");
+            Serial.println("🎯 CONTROLE INDIVIDUAL:");
+            Serial.println("   LED:0:FF0000      // LED 0 vermelho");
+            Serial.println("   LED:1:00FF00      // LED 1 verde");
+            Serial.println("   LED:2:0000FF      // LED 2 azul");
+            Serial.println("   LED:3:FFFF00      // LED 3 amarelo");
+            Serial.println("   LED:4:FF00FF      // LED 4 rosa");
+            Serial.println("   LED:5:00FFFF      // LED 5 ciano");
+            Serial.println("   LED:6:FFFFFF      // LED 6 branco");
+            Serial.println("   LED:7:FF8000      // LED 7 laranja");
+            Serial.println("");
+            Serial.println("🎯 CONTROLE GERAL:");
+            Serial.println("   ALL_LED:ON        // Liga todos (branco)");
+            Serial.println("   ALL_LED:OFF       // Desliga todos");
+            Serial.println("");
+            Serial.println("🎯 EFEITOS PRÉ-DEFINIDOS:");
+            Serial.println("   ALL_LED:RAINBOW   // Efeito arco-íris");
+            Serial.println("   ALL_LED:BLINK     // Efeito piscante");
+            Serial.println("   ALL_LED:WAVE_BLUE // Onda azul");
+            Serial.println("   ALL_LED:FIRE      // Efeito fogo");
+            Serial.println("   ALL_LED:TWINKLE   // Efeito estrelas");
+            Serial.println("   ALL_LED:CHASE     // Efeito perseguição");
+            Serial.println("   ALL_LED:SPECTRUM  // Espectro de cores");
+            Serial.println("");
+            Serial.println("🎯 COMANDOS DO SISTEMA:");
+            Serial.println("   STATUS            // Status completo");
+            Serial.println("   EFFECT_STATUS     // Status dos efeitos");
+            Serial.println("   SAVE_EFFECT       // Salva efeito atual");
+            Serial.println("   CLEAR_EFFECT      // Limpa efeito salvo");
+            Serial.println("═══════════════════════════════════════");
+        }
+        else if(message == "EFFECT_STATUS") {
+            Serial.println("\n═══════════════════════════════════════");
+            Serial.println("         STATUS DE EFEITOS LED");
+            Serial.println("═══════════════════════════════════════");
+            Serial.println("💾 EFEITO SALVO NAS PREFERÊNCIAS:");
+            Serial.println("   • Nome: " + savedEffect);
+            Serial.println("");
+            Serial.println("🎮 ESTADO ATUAL:");
+            Serial.println("   • Efeito ativo: " + String(effectActive ? currentEffect : "Nenhum"));
+            Serial.println("   • Modo manual: " + String(manualControl ? "Sim ✅" : "Não ❌"));
+            Serial.println("   • Controle automático: " + String(!manualControl ? "Sim ✅" : "Não ❌"));
+            Serial.println("");
+            Serial.println("⚙️ SISTEMA:");
+            Serial.println("   • Em feedback: " + String(isInFeedbackMode ? "Sim ⚡" : "Não"));
+            Serial.println("   • Deve restaurar: " + String(shouldRestoreEffect ? "Sim 🔄" : "Não"));
+            Serial.println("");
+            Serial.println("🎯 AÇÕES DISPONÍVEIS:");
+            Serial.println("   • Envie 'SAVE_EFFECT' para salvar atual");
+            Serial.println("   • Envie 'CLEAR_EFFECT' para limpar");
+            Serial.println("═══════════════════════════════════════");
+        }
+        else if(message == "SAVE_EFFECT") {
+            if(effectActive) {
+                saveEffectToPrefs(currentEffect);
+                Serial.println("✅ Efeito atual salvo: " + currentEffect);
+                Serial.println("   Será restaurado na próxima inicialização");
+            } else {
+                saveEffectToPrefs("NONE");
+                Serial.println("✅ Configuração 'sem efeito' salva");
+                Serial.println("   LEDs permanecerão desligados na inicialização");
+            }
+        }
+        else if(message == "CLEAR_EFFECT") {
+            clearEffectPrefs();
+            Serial.println("✅ Efeito salvo foi removido");
+            Serial.println("   Próxima inicialização usará padrão do sistema");
+        }
+        else if(message == "RESET_LEDS") {
+            effectActive = false;
+            manualControl = false;
+            clearAllLEDs();
+            saveEffectToPrefs("NONE");
+            Serial.println("✅ LEDs resetados para estado padrão");
+        }
+        else if(message == "TEST_LEDS") {
+            Serial.println("🔧 Teste sequencial de LEDs...");
+            
+            // Teste de todas as cores básicas
+            CRGB colors[] = {CRGB::Red, CRGB::Green, CRGB::Blue, 
+                            CRGB::Yellow, CRGB::Cyan, CRGB::Magenta, 
+                            CRGB::White};
+            
+            for(int i = 0; i < 7; i++) {
+                fill_solid(leds, NUM_LEDS, colors[i]);
+                FastLED.show();
+                Serial.println("   Cor " + String(i+1) + " de 7");
+                delay(300);
+            }
+            
+            // Teste individual
+            Serial.println("   Teste individual de LEDs...");
+            clearAllLEDs();
+            for(int i = 0; i < NUM_LEDS; i++) {
+                leds[i] = CRGB::White;
+                FastLED.show();
+                delay(50);
+                leds[i] = CRGB::Black;
+            }
+            
+            // Restaura estado anterior
+            if(effectActive) {
+                effectActive = true;
+                effectTimer = millis();
+                Serial.println("   Restaurando efeito anterior...");
+            } else if(savedEffect != "NONE") {
+                effectActive = true;
+                currentEffect = savedEffect;
+                effectTimer = millis();
+                Serial.println("   Restaurando efeito salvo: " + savedEffect);
+            } else {
+                clearAllLEDs();
+                Serial.println("   LEDs desligados");
+            }
+            
+            Serial.println("✅ Teste de LEDs completo!");
+        }
+        else if(message == "SYSTEM_INFO") {
+            Serial.println("\n═══════════════════════════════════════");
+            Serial.println("         INFORMAÇÕES DO SISTEMA");
+            Serial.println("═══════════════════════════════════════");
+            Serial.println("📊 ESPECIFICAÇÕES:");
+            Serial.println("   • CPU: Xtensa LX7 Dual-Core");
+            Serial.println("   • Frequência: 240 MHz");
+            Serial.println("   • RAM: 512KB SRAM");
+            Serial.println("   • Flash: 8MB");
+            Serial.println("");
+            Serial.println("🎮 PERIFÉRICOS:");
+            Serial.println("   • Botões: 16 (via shift register)");
+            Serial.println("   • LEDs: 16 RGB WS2812B");
+            Serial.println("   • Display: 1.14\" IPS (240x135)");
+            Serial.println("   • Encoder: EC11 (rotação + botão)");
+            Serial.println("   • Bateria: Li-Po com TP4056");
+            Serial.println("");
+            Serial.println("🌐 CONECTIVIDADE:");
+            Serial.println("   • Wi-Fi: 802.11 b/g/n");
+            Serial.println("   • Bluetooth: BLE");
+            Serial.println("   • USB: Serial/UART");
+            Serial.println("   • Protocolos: TCP, UDP, HTTP");
+            Serial.println("═══════════════════════════════════════");
+        }
+        else if(message == "HELP" || message == "?") {
+            Serial.println("\n═══════════════════════════════════════");
+            Serial.println("         COMANDOS DO SISTEMA");
+            Serial.println("═══════════════════════════════════════");
+            Serial.println("🎮 CONTROLE BÁSICO:");
+            Serial.println("   CONNECTED         // Simula conexão USB");
+            Serial.println("   DISCONNECT        // Simula desconexão");
+            Serial.println("   STATUS            // Status completo");
+            Serial.println("   SYSTEM_INFO       // Especificações");
+            Serial.println("");
+            Serial.println("💡 CONTROLE DE LEDs:");
+            Serial.println("   LED_HELP          // Todos comandos LED");
+            Serial.println("   EFFECT_STATUS     // Status de efeitos");
+            Serial.println("   TEST_LEDS         // Teste sequencial");
+            Serial.println("   RESET_LEDS        // Reset para padrão");
+            Serial.println("");
+            Serial.println("⚙️ CONFIGURAÇÃO:");
+            Serial.println("   SAVE_EFFECT       // Salva efeito atual");
+            Serial.println("   CLEAR_EFFECT      // Limpa efeito salvo");
+            Serial.println("");
+            Serial.println("❓ AJUDA:");
+            Serial.println("   HELP ou ?         // Esta mensagem");
+            Serial.println("═══════════════════════════════════════");
+        }
+        else {
+            Serial.println("❌ Comando não reconhecido: " + message);
+            Serial.println("   Digite 'HELP' para ver comandos disponíveis");
         }
     }
 }
 
 // =========================================================================
-// === SETUP PRINCIPAL =====================================================
+// === FUNÇÕES PARA PERSISTÊNCIA DE EFEITOS LED ===========================
+// =========================================================================
+
+void loadEffectFromPrefs() {
+    preferences.begin(PREFS_EFFECT_KEY, true); // Modo leitura
+    
+    if(preferences.isKey("effect")) {
+        savedEffect = preferences.getString("effect", "NONE");
+        Serial.println("Efeito carregado: " + savedEffect);
+    } else {
+        savedEffect = "NONE";
+        Serial.println("Nenhum efeito salvo encontrado");
+    }
+    
+    preferences.end();
+}
+
+void saveEffectToPrefs(String effectName) {
+    preferences.begin(PREFS_EFFECT_KEY, false); // Modo escrita
+    preferences.putString("effect", effectName);
+    preferences.end();
+    
+    savedEffect = effectName;
+    Serial.println("Efeito salvo: " + effectName);
+}
+
+void clearEffectPrefs() {
+    preferences.begin(PREFS_EFFECT_KEY, false);
+    preferences.clear();
+    preferences.end();
+    
+    savedEffect = "NONE";
+    Serial.println("Efeitos limpos das preferências");
+}
+
+// =========================================================================
+// === FUNÇÃO DE FEEDBACK VISUAL ==========================================
+// =========================================================================
+
+void showConnectionFeedback(ConnectionProtocol newProtocol) {
+    isInFeedbackMode = true;
+    feedbackStartTime = millis();
+    shouldRestoreEffect = effectActive;  // Salva se tinha efeito ativo
+    
+    // Pausa efeito atual
+    if(effectActive) {
+        effectActive = false;
+    }
+    
+    // Mostra feedback baseado no protocolo
+    if(newProtocol == USB) {
+        // Feedback azul para USB
+        fill_solid(leds, NUM_LEDS, CRGB::Blue);
+        FastLED.show();
+        Serial.println("✅ Feedback: Conectado via USB");
+    } 
+    else if(newProtocol == WIFI) {
+        // Feedback verde para Wi-Fi
+        fill_solid(leds, NUM_LEDS, CRGB::Green);
+        FastLED.show();
+        Serial.println("✅ Feedback: Conectado via Wi-Fi");
+    } 
+    else {
+        // Feedback vermelho para desconexão
+        fill_solid(leds, NUM_LEDS, CRGB::Red);
+        FastLED.show();
+        Serial.println("⚠️ Feedback: Desconectado");
+    }
+}
+
+// =========================================================================
+// === RESTAURAR EFEITO APÓS FEEDBACK =====================================
+// =========================================================================
+
+void restoreSavedEffect() {
+    
+    isInFeedbackMode = false;
+    shouldRestoreEffect = false;
+    effectActive = false;
+    manualControl = false;
+    clearAllLEDs();
+    
+    Serial.println("🔄 Estado resetado após feedback");
+}
+
+
+// =========================================================================
+// === MOSTRAR STATUS ATUAL DOS LEDs ======================================
+// =========================================================================
+
+/*void showCurrentStatusLEDs() {
+    // NÃO faz nada se tem efeito ativo!
+    if(effectActive) {
+        return;  // <-- IMPORTANTE: Deixa o efeito rodando
+    }
+    
+    if(wifiConfigMode) {
+        // Modo config portal - LEDs azuis fixos (não piscam)
+        fill_solid(leds, NUM_LEDS, CRGB::Blue);
+        FastLED.show();
+        return;
+    }
+    
+    // Mostra cor baseada no protocolo ativo (sem piscar)
+    if(activeProtocol == USB) {
+        // Conectado via USB - azul fixo
+        fill_solid(leds, NUM_LEDS, CRGB::Blue);
+        FastLED.show();
+    } 
+    else if(activeProtocol == WIFI) {
+        // Conectado via Wi-Fi - verde fixo
+        fill_solid(leds, NUM_LEDS, CRGB::Green);
+        FastLED.show();
+    } 
+    else {
+        // Desconectado - LEDs desligados (não piscam mais)
+        clearAllLEDs();
+    }
+}*/
+
+// =========================================================================
+// === FUNÇÕES PARA MÁSCARA DE LEDs =======================================
+// =========================================================================
+
+void clearLedMask() {
+    for(int i = 0; i < NUM_LEDS; i++) {
+        ledMask[i] = false;
+    }
+    Serial.println("Máscara de LEDs limpa da memória");
+}
+
+void applyLedMask() {
+    // Aplica a máscara: LEDs com cor fixa mantêm sua cor
+    for(int i = 0; i < NUM_LEDS; i++) {
+        if(ledMask[i]) {
+            leds[i] = ledFixedColors[i];
+        }
+    }
+}
+
+// =========================================================================
+// === SETUP PRINCIPAL - ATUALIZADO ========================================
 // =========================================================================
 
 void setup() {
     Serial.begin(115200);
-    preferences.begin(PREFS_KEY, false);
     
     initializeDisplay();
     initButtons();
@@ -1610,32 +2343,57 @@ void setup() {
     pinMode(PIN_TP4056_CE, OUTPUT);
     digitalWrite(PIN_TP4056_CE, LOW);
     
-    // Inicializacao
+    // Carrega configurações
+    loadBrightnessFromPrefs();
+    loadEffectFromPrefs();
+    
+    // Inicialização com animação própria
     drawLoadingScreen();
     initWiFi();
+    
+    // APÓS inicialização, RESTAURA configurações
+    if(savedEffect != "NONE" && savedEffect != "") {
+        effectActive = true;
+        currentEffect = savedEffect;
+        manualControl = true;
+        effectTimer = millis();
+        
+        Serial.println("✅ Efeito restaurado: " + savedEffect);
+        Serial.println("✅ Máscara de LEDs carregada");
+    } else {
+        bool hasFixedLeds = false;
+        for(int i = 0; i < NUM_LEDS; i++) {
+            if(ledMask[i]) hasFixedLeds = true;
+        }
+        
+        if(hasFixedLeds) {
+            effectActive = false;
+            manualControl = true;
+            applyLedMask();
+            FastLED.show();
+            Serial.println("✅ LEDs fixos restaurados (sem efeito)");
+        } else {
+            Serial.println("Nenhuma configuração salva para restaurar");
+        }
+    }
     
     // Tela principal
     currentState = STATE_MAIN;
     drawMainScreen();
     
-    // Info inicial
+    // Info inicial atualizada
     Serial.println("\n═══════════════════════════════════════");
     Serial.println("       ESP32 DECK - " + String(FIRMWARE_VERSION));
     Serial.println("═══════════════════════════════════════");
-    Serial.println("Desenvolvedor: " + String(DEVELOPER));
-    Serial.println("GitHub: " + String(GITHUB));
-    Serial.println("═══════════════════════════════════════");
-    Serial.println("🎮 CONTROLES:");
-    Serial.println("   • Encoder: Menu de configuracoes");
-    Serial.println("   • Botões: Comandos (tela principal)");
-    Serial.println("═══════════════════════════════════════");
-    Serial.println("💡 COMANDOS LED:");
-    Serial.println("   Envie 'LED_HELP' para ver opcoes");
+    Serial.println("🎮 NOVO SISTEMA DE LEDs:");
+    Serial.println("   • Efeitos + LEDs fixos simultâneos");
+    Serial.println("   • Cores fixas são salvas e restauradas");
+    Serial.println("   • Digite 'MASK_HELP' para comandos");
     Serial.println("═══════════════════════════════════════");
 }
 
 // =========================================================================
-// === LOOP PRINCIPAL ======================================================
+// === LOOP PRINCIPAL - MODIFICADO =========================================
 // =========================================================================
 
 void loop() {
@@ -1659,12 +2417,14 @@ void loop() {
         lastBatteryUpdate = millis();
     }
     
+    // ATUALIZA LEDs SEMPRE (independente do estado)
+    updateLEDs();
+    
     // Processa estado atual
     switch(currentState) {
         case STATE_MAIN:
             checkButtons();
             checkSerialCommands();
-            updateLEDs();
             
             if(WiFi.status() == WL_CONNECTED) {
                 checkUdpSearch();
@@ -1710,17 +2470,6 @@ void loop() {
                 server.handleClient();
             }
             break;
-            
-        case STATE_LED_EFFECTS:
-            if(effectActive) {
-                updateEffect();
-            }
-            break;
-    }
-    
-    // Efeitos de LED
-    if(effectActive) {
-        updateEffect();
     }
     
     delay(20);
