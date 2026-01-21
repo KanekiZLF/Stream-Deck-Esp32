@@ -119,6 +119,26 @@ enum SystemState
 };
 SystemState currentState = STATE_LOADING;
 
+// =========================================================================
+// === SISTEMA DE POP-UP/MODAL PARA CONFIRMAÇÕES =========================
+// =========================================================================
+
+// Estrutura para configuração do pop-up
+struct PopupConfig
+{
+    String title;
+    String message;
+    String option1;
+    String option2;
+    uint16_t color1;
+    uint16_t color2;
+    int result; // -1: não decidido, 0: cancelar, 1: confirmar
+};
+
+PopupConfig currentPopup;
+bool popupActive = false;
+bool popupNeedsRedraw = false;
+
 // Variaveis para menu com scroll
 int menuSelection = 0;
 int menuScrollOffset = 0;
@@ -193,6 +213,20 @@ void drawBatteryInfoScreen();
 void drawLedEffectsScreen();
 void drawAdvancedSettings();
 void drawAboutDeviceScreen();
+
+// Pop-up System (NOVAS)
+void showPopup(const String &title, const String &message,
+               const String &confirmText,
+               const String &cancelText,
+               uint16_t confirmColor,
+               uint16_t cancelColor);
+
+void hidePopup();
+void drawPopup();
+void handlePopupInput();
+void executePopupAction();
+void redrawPreviousScreen();
+void updatePopupSelection(int selection);
 
 // Controles
 void handleEncoder();
@@ -1305,17 +1339,17 @@ void handleEncoderButton()
                 switch (wifiMenuSelection)
                 {
                 case 0: // Limpar credenciais
-                    clearWiFiCredentials();
-                    currentState = STATE_SETTINGS_MENU;
-                    menuSelection = 0;
-                    resetRenderStates();
-                    drawSettingsMenu();
-                    Serial.println("Credenciais Wi-Fi limpas");
+                    showPopup("LIMPAR WI-FI",
+                              "Tem certeza que deseja apagar as credenciais Wi-Fi salvas?",
+                              "APAGAR", "CANCELAR",
+                              ERROR_COLOR, SECONDARY_COLOR);
+                    Serial.println("Mostrando popup para limpar Wi-Fi");
                     break;
                 case 1: // Configurar nova rede
-                    currentState = STATE_WIFI_CONFIG_PORTAL;
-                    resetRenderStates();
-                    resetWiFiCredentials();
+                    showPopup("CONFIGURAR REDE",
+                              "Deseja configurar uma nova rede Wi-Fi?",
+                              "CONFIGURAR", "CANCELAR",
+                              PRIMARY_COLOR, SECONDARY_COLOR);
                     break;
                 case 2: // Voltar
                     currentState = STATE_SETTINGS_MENU;
@@ -2880,6 +2914,315 @@ void listAllPreferences()
 }
 
 // =========================================================================
+// === FUNÇÕES DO SISTEMA DE POP-UP =======================================
+// =========================================================================
+
+void showPopup(const String &title, const String &message,
+               const String &confirmText = "CONFIRMAR",
+               const String &cancelText = "CANCELAR",
+               uint16_t confirmColor = TFT_GREEN,
+               uint16_t cancelColor = TFT_RED)
+{
+
+    currentPopup.title = title;
+    currentPopup.message = message;
+    currentPopup.option1 = confirmText;
+    currentPopup.option2 = cancelText;
+    currentPopup.color1 = confirmColor;
+    currentPopup.color2 = cancelColor;
+    currentPopup.result = -1;
+    popupActive = true;
+    popupNeedsRedraw = true;
+
+    Serial.println("Popup ativado: " + title);
+}
+
+void hidePopup()
+{
+    popupActive = false;
+    currentPopup.result = -1;
+
+    // Redesenha a tela anterior BASEADA NO currentState
+    // (que deve ser mantido como STATE_WIFI_CONFIG_MENU durante o popup)
+    redrawPreviousScreen();
+}
+
+void drawPopup()
+{
+    if (!popupNeedsRedraw)
+        return;
+
+    // 1. FUNDO ESCURO
+    tft.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, tft.color565(30, 30, 30));
+
+    // 2. JANELA DO POPUP
+    int popupWidth = 200;
+    int popupHeight = 120;
+    int popupX = (SCREEN_WIDTH - popupWidth) / 2;
+    int popupY = (SCREEN_HEIGHT - popupHeight) / 2;
+
+    // Moldura da janela
+    tft.fillRoundRect(popupX, popupY, popupWidth, popupHeight, 8, MENU_BG_COLOR);
+    tft.drawRoundRect(popupX, popupY, popupWidth, popupHeight, 8, PRIMARY_COLOR);
+
+    // 3. CABEÇALHO
+    tft.fillRoundRect(popupX, popupY, popupWidth, 25, 8, PRIMARY_COLOR);
+    tft.setTextColor(BACKGROUND_COLOR);
+    tft.setTextSize(1);
+    tft.setTextDatum(MC_DATUM);
+    tft.drawString(currentPopup.title, popupX + popupWidth / 2, popupY + 12);
+
+    // 4. MENSAGEM
+    tft.setTextColor(TEXT_COLOR);
+    tft.setTextDatum(TC_DATUM);
+
+    String message = currentPopup.message;
+    int maxCharsPerLine = 28;
+    int lineHeight = 12;
+    int textY = popupY + 40;
+
+    // Divide a mensagem em linhas
+    while (message.length() > 0)
+    {
+        String line;
+        if (message.length() > maxCharsPerLine)
+        {
+            int lastSpace = message.lastIndexOf(' ', maxCharsPerLine);
+            if (lastSpace > 0)
+            {
+                line = message.substring(0, lastSpace);
+                message = message.substring(lastSpace + 1);
+            }
+            else
+            {
+                line = message.substring(0, maxCharsPerLine);
+                message = message.substring(maxCharsPerLine);
+            }
+        }
+        else
+        {
+            line = message;
+            message = "";
+        }
+
+        tft.drawString(line, popupX + popupWidth / 2, textY);
+        textY += lineHeight;
+    }
+
+    // 5. BOTÕES
+    int buttonWidth = 80;
+    int buttonHeight = 26;
+    int buttonY = popupY + popupHeight - 35;
+
+    // Botão Cancelar (esquerda)
+    int cancelX = popupX + 15;
+    tft.fillRoundRect(cancelX, buttonY, buttonWidth, buttonHeight, 5, currentPopup.color2);
+    tft.drawRoundRect(cancelX, buttonY, buttonWidth, buttonHeight, 5, BACKGROUND_COLOR);
+    tft.setTextColor(BACKGROUND_COLOR);
+    tft.setTextDatum(MC_DATUM);
+    tft.drawString(currentPopup.option2, cancelX + buttonWidth / 2, buttonY + buttonHeight / 2);
+
+    // Botão Confirmar (direita)
+    int confirmX = popupX + popupWidth - buttonWidth - 15;
+    tft.fillRoundRect(confirmX, buttonY, buttonWidth, buttonHeight, 5, currentPopup.color1);
+    tft.drawRoundRect(confirmX, buttonY, buttonWidth, buttonHeight, 5, BACKGROUND_COLOR);
+    tft.drawString(currentPopup.option1, confirmX + buttonWidth / 2, buttonY + buttonHeight / 2);
+
+    // 6. INSTRUÇÕES
+    tft.setTextColor(SECONDARY_COLOR);
+    tft.setTextSize(1);
+    tft.setTextDatum(TC_DATUM);
+    tft.drawString("Encoder: Navegar | Click: Selecionar",
+                   popupX + popupWidth / 2, popupY + popupHeight - 8);
+
+    // 7. Inicializa com Cancelar selecionado (sem chamar updatePopupSelection)
+    tft.drawRoundRect(cancelX - 2, buttonY - 2,
+                      buttonWidth + 4, buttonHeight + 4, 7, ACCENT_COLOR);
+
+    popupNeedsRedraw = false;
+}
+
+void handlePopupInput()
+{
+    if (!popupActive)
+        return;
+
+    // 1. Controle com encoder
+    static int popupSelection = 0; // 0: Cancelar, 1: Confirmar
+    static bool selectionChanged = false;
+
+    // Detectar rotação do encoder
+    int currentStateEncoder = digitalRead(ENCODER_CLK_PIN);
+    if (currentStateEncoder != lastEncoderState)
+    {
+        int dtState = digitalRead(ENCODER_DT_PIN);
+
+        int oldSelection = popupSelection;
+
+        if (dtState != currentStateEncoder)
+        {
+            popupSelection = 1; // Move para Confirmar
+        }
+        else
+        {
+            popupSelection = 0; // Move para Cancelar
+        }
+
+        // Só marca como mudado se realmente mudou
+        if (oldSelection != popupSelection)
+        {
+            selectionChanged = true;
+        }
+    }
+    lastEncoderState = currentStateEncoder;
+
+    // 2. Se a seleção mudou, atualiza visualmente
+    if (selectionChanged)
+    {
+        updatePopupSelection(popupSelection);
+        selectionChanged = false;
+    }
+
+    // 3. Detectar clique do encoder
+    int btnState = digitalRead(ENCODER_BTN_PIN);
+    if (btnState == LOW && encoderBtnLastState == HIGH)
+    {
+        unsigned long now = millis();
+
+        if (now - lastEncoderBtnPress > ENCODER_DEBOUNCE_DELAY)
+        {
+            currentPopup.result = popupSelection; // 0 ou 1
+
+            // Executa ação baseada na escolha
+            if (currentPopup.result == 1)
+            { // Confirmar
+                executePopupAction();
+            }
+
+            // Fecha o popup
+            hidePopup();
+            popupSelection = 0; // Reseta para próxima vez
+
+            lastEncoderBtnPress = now;
+        }
+    }
+    encoderBtnLastState = btnState;
+}
+
+void updatePopupSelection(int selection)
+{
+    // Coordenadas do popup
+    int popupWidth = 200;
+    int popupHeight = 120;
+    int popupX = (SCREEN_WIDTH - popupWidth) / 2;
+    int popupY = (SCREEN_HEIGHT - popupHeight) / 2;
+
+    int buttonWidth = 80;
+    int buttonHeight = 26;
+    int buttonY = popupY + popupHeight - 35;
+
+    // Botão Cancelar
+    int cancelX = popupX + 15;
+    // Botão Confirmar
+    int confirmX = popupX + popupWidth - buttonWidth - 15;
+
+    // Primeiro, remove os highlights antigos
+    // Desenha bordas normais dos botões
+    tft.drawRoundRect(cancelX - 2, buttonY - 2,
+                      buttonWidth + 4, buttonHeight + 4, 7, MENU_BG_COLOR);
+    tft.drawRoundRect(confirmX - 2, buttonY - 2,
+                      buttonWidth + 4, buttonHeight + 4, 7, MENU_BG_COLOR);
+
+    // Agora aplica o highlight no botão selecionado
+    if (selection == 0)
+    {
+        tft.drawRoundRect(cancelX - 2, buttonY - 2,
+                          buttonWidth + 4, buttonHeight + 4, 7, ACCENT_COLOR);
+    }
+    else
+    {
+        tft.drawRoundRect(confirmX - 2, buttonY - 2,
+                          buttonWidth + 4, buttonHeight + 4, 7, ACCENT_COLOR);
+    }
+}
+
+void executePopupAction()
+{
+    Serial.println("Popup confirmado: " + currentPopup.title);
+
+    // Executa ação baseada no título do popup
+    if (currentPopup.title == "LIMPAR WI-FI")
+    {
+        clearWiFiCredentials();
+
+        // Após limpar, volta para o menu Wi-Fi
+        currentState = STATE_WIFI_CONFIG_MENU;
+        resetRenderStates();
+        drawWifiConfigMenu();
+    }
+    else if (currentPopup.title == "CONFIGURAR REDE")
+    {
+        // Inicia portal de configuração
+        currentState = STATE_WIFI_CONFIG_PORTAL;
+        resetRenderStates();
+        resetWiFiCredentials();
+    }
+    else if (currentPopup.title == "RESET DE FÁBRICA")
+    {
+        // Implementar reset de fábrica aqui
+        Serial.println("Executando reset de fábrica...");
+        // preferences.clear(); // Cuidado!
+
+        // Volta para menu principal após reset
+        currentState = STATE_MAIN;
+        resetRenderStates();
+        drawMainScreen();
+    }
+    // Adicione mais ações conforme necessário
+}
+
+void redrawPreviousScreen()
+{
+    // Primeiro, limpa completamente a tela
+    tft.fillScreen(BACKGROUND_COLOR);
+
+    // Redesenha a tela baseada no estado atual
+    switch (currentState)
+    {
+    case STATE_SETTINGS_MENU:
+        resetRenderStates(); // Reseta estados de renderização
+        drawSettingsMenu();
+        break;
+    case STATE_WIFI_CONFIG_MENU:
+        lastWifiMenuSelection = -1; // Força redesenho completo
+        drawWifiConfigMenu();
+        break;
+    case STATE_WIFI_CONFIG_PORTAL:
+        drawWifiConfigPortal();
+        break;
+    case STATE_MAIN:
+        drawMainScreen();
+        break;
+    case STATE_ADVANCED_SETTINGS:
+        resetRenderStates();
+        drawAdvancedSettings();
+        break;
+    case STATE_BRIGHTNESS_CONFIG:
+        drawBrightnessConfigScreen();
+        break;
+    case STATE_LED_EFFECTS:
+        menuSelection = 0; // Reseta seleção
+        drawLedEffectsScreen();
+        break;
+    case STATE_BATTERY_INFO:
+        drawBatteryInfoScreen();
+        break;
+    case STATE_ABOUT_DEVICE:
+        drawAboutDeviceScreen();
+        break;
+    }
+}
+// =========================================================================
 // === SETUP PRINCIPAL - ATUALIZADO ========================================
 // =========================================================================
 
@@ -2964,7 +3307,14 @@ void loop()
     static unsigned long lastEncoderCheck = 0;
     if (millis() - lastEncoderCheck > 10)
     {
-        handleEncoder();
+        if (popupActive)
+        {
+            handlePopupInput();
+        }
+        else
+        {
+            handleEncoder();
+        }
         lastEncoderCheck = millis();
     }
 
@@ -2976,70 +3326,79 @@ void loop()
         lastBatteryUpdate = millis();
     }
 
-    // ATUALIZA LEDs SEMPRE (independente do estado)
+    // ATUALIZA LEDs SEMPRE
     updateLEDs();
 
     // Processa estado atual
-    switch (currentState)
+    if (popupActive)
     {
-    case STATE_MAIN:
-        checkButtons();
-        checkSerialCommands();
-
-        if (WiFi.status() == WL_CONNECTED)
+        // Se popup está ativo, desenha ele
+        drawPopup();
+    }
+    else
+    {
+        // Estado normal do sistema
+        switch (currentState)
         {
-            checkUdpSearch();
+        case STATE_MAIN:
+            checkButtons();
+            checkSerialCommands();
 
-            if (!client.connected())
+            if (WiFi.status() == WL_CONNECTED)
             {
-                WiFiClient newClient = serverTCP.available();
-                if (newClient)
+                checkUdpSearch();
+
+                if (!client.connected())
                 {
-                    client = newClient;
-                    activeProtocol = WIFI;
-                    drawMainScreen();
-                    Serial.println("Cliente Wi-Fi conectado");
+                    WiFiClient newClient = serverTCP.available();
+                    if (newClient)
+                    {
+                        client = newClient;
+                        activeProtocol = WIFI;
+                        drawMainScreen();
+                        Serial.println("Cliente Wi-Fi conectado");
+                    }
                 }
-            }
 
-            // Processa comandos Wi-Fi
-            if (client.connected())
-            {
-                while (client.available())
+                // Processa comandos Wi-Fi
+                if (client.connected())
                 {
-                    String msg = client.readStringUntil('\n');
-                    msg.trim();
+                    while (client.available())
+                    {
+                        String msg = client.readStringUntil('\n');
+                        msg.trim();
 
-                    if (msg.startsWith("LED:") || msg.startsWith("ALL_LED:"))
-                    {
-                        processLedCommand(msg);
-                    }
-                    else if (msg == "PING")
-                    {
-                        client.println("PONG");
-                    }
-                    else if (msg == "DISCONNECT")
-                    {
-                        client.stop();
-                        if (activeProtocol == WIFI)
+                        if (msg.startsWith("LED:") || msg.startsWith("ALL_LED:"))
                         {
-                            activeProtocol = NONE;
-                            drawMainScreen();
+                            processLedCommand(msg);
                         }
-                        Serial.println("Cliente Wi-Fi desconectado por comando");
+                        else if (msg == "PING")
+                        {
+                            client.println("PONG");
+                        }
+                        else if (msg == "DISCONNECT")
+                        {
+                            client.stop();
+                            if (activeProtocol == WIFI)
+                            {
+                                activeProtocol = NONE;
+                                drawMainScreen();
+                            }
+                            Serial.println("Cliente Wi-Fi desconectado por comando");
+                        }
                     }
                 }
             }
-        }
-        break;
+            break;
 
-    case STATE_WIFI_CONFIG_PORTAL:
-        if (wifiConfigMode)
-        {
-            dnsServer.processNextRequest();
-            server.handleClient();
+        case STATE_WIFI_CONFIG_PORTAL:
+            if (wifiConfigMode)
+            {
+                dnsServer.processNextRequest();
+                server.handleClient();
+            }
+            break;
         }
-        break;
     }
 
     delay(20);
