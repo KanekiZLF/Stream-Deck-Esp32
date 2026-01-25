@@ -2049,6 +2049,26 @@ class Esp32DeckApp(ctk.CTk):
         self.logger.info(f"  💻 Dev: {DEVELOPER}")
         self.logger.info(f"🔗 GitHub: {GITHUB_URL}")
 
+
+        self._leds_synchronized = False
+        self._sync_lock = threading.Lock()
+
+    def _sync_led_colors_from_config(self):
+        """Sincroniza as cores dos LEDs com a configuração salva."""
+        with self._sync_lock:
+            if not (self.serial_manager.is_connected or self.wifi_manager.is_connected):
+                return
+                
+            self.logger.info("🔄 Sincronizando cores dos LEDs com a configuração...")
+            
+            for btn_key, btn_conf in self.config.data.get('buttons', {}).items():
+                color_hex = btn_conf.get('led_color', '#FFFFFF')
+                if color_hex and color_hex != '#FFFFFF':  # Só envia se não for branco padrão
+                    time.sleep(0.05)  # Pequeno delay entre comandos
+                    self._send_led_color_command(btn_key, color_hex, silent=True)
+            
+            self.logger.info("✅ Cores dos LEDs sincronizadas")
+
     def _reset_icon_loader(self):
         """Destrói e recria o IconLoader para forçar a limpeza total da memória de imagens."""
         size = self.config.data.get('appearance', {}).get('icon_size', ICON_SIZE[0])
@@ -2058,6 +2078,14 @@ class Esp32DeckApp(ctk.CTk):
             del self.icon_loader 
             
         self.icon_loader = IconLoader(icon_size=(size, size))
+
+    def force_sync_leds(self):
+        """Força a sincronização dos LEDs com a configuração."""
+        if self.serial_manager.is_connected or self.wifi_manager.is_connected:
+            self._sync_led_colors_from_config()
+            CTkMessageDialog.showinfo(self, "Sincronização", "LEDs sincronizados com sucesso!", self.logger)
+        else:
+            CTkMessageDialog.showwarning(self, "Aviso", "Conecte ao ESP32 antes de sincronizar LEDs.", self.logger)
 
     def _setup_app_icon(self):
         icon_path = get_app_icon_path()
@@ -2351,8 +2379,20 @@ class Esp32DeckApp(ctk.CTk):
         ctk.CTkButton(btn_frame, text="🔄 Atualizar", width=80, command=self.refresh_all).pack(side='right', padx=5)
     
     def _update_header_status(self, connected: bool, connection_type: str = 'Serial'):
-        self.after(0, lambda: self._set_header_visuals(connected, connection_type))
+        """Atualiza o status da conexão e sincroniza LEDs se conectado."""
+        self.after(0, lambda: self._on_connection_status_changed(connected, connection_type))
+
+    def _on_connection_status_changed(self, connected: bool, connection_type: str):
+        """Processa mudança de status de conexão."""
+        self._set_header_visuals(connected, connection_type)
         
+        if connected and not self._leds_synchronized:
+            # Pequeno delay para garantir que a conexão está estável
+            self.after(1000, self._sync_led_colors_from_config)
+            self._leds_synchronized = True
+        elif not connected:
+            self._leds_synchronized = False
+            
     def _set_header_visuals(self, connected: bool, connection_type: str = 'Serial'):
         
         # Verifica se os widgets do cabeçalho e conexão foram construídos (evita o erro no __init__)
@@ -2676,6 +2716,23 @@ class Esp32DeckApp(ctk.CTk):
 
         self._update_quick_led_preview()
 
+        # --- 3. Sincronização de Cores ---
+        sync_frame = ctk.CTkFrame(parent, corner_radius=8, border_width=1, border_color=self.colors["secondary"])
+        sync_frame.pack(fill='x', padx=10, pady=(5, 15))
+
+        ctk.CTkLabel(
+            sync_frame, 
+            text="Sincronização", 
+            font=ctk.CTkFont(weight="bold", size=13)
+        ).grid(row=0, column=0, sticky='w', padx=10, pady=(8, 5))
+
+        ctk.CTkButton(
+            sync_frame,
+            text="🔄 Sincronizar LEDs",
+            command=self.force_sync_leds,
+            fg_color=self.colors["primary"]
+        ).grid(row=1, column=0, sticky='ew', padx=10, pady=(5, 10))
+
     def _update_quick_led_preview(self, *args):
         """Atualiza a pré-visualização de cor rápida baseada na cor salva do botão selecionado."""
         selected_key = self.led_button_select.get()
@@ -2713,33 +2770,45 @@ class Esp32DeckApp(ctk.CTk):
         color = self.quick_led_color_var.get() 
         self._send_led_color_command(selected_key, color)
 
-    def _send_led_color_command(self, button_key: str, color_hex: str):
+    def _send_led_color_command(self, button_key: str, color_hex: str, silent: bool = False):
         """Envia o comando de cor do LED via conexão ativa (Serial ou Wi-Fi)."""
         
         is_serial = self.serial_manager.is_connected
         is_wifi = self.wifi_manager.is_connected
         
         if not is_serial and not is_wifi:
-            self.logger.warn("❌ Não conectado: Conecte ao USB ou Wi-Fi para enviar comandos de LED.")
-            CTkMessageDialog.showwarning(self, "Aviso", "Não é possível enviar comandos de LED. Conecte primeiro.", self.logger)
-            return
+            if not silent:
+                self.logger.warn("❌ Não conectado: Conecte ao USB ou Wi-Fi para enviar comandos de LED.")
+                CTkMessageDialog.showwarning(self, "Aviso", "Não é possível enviar comandos de LED. Conecte primeiro.", self.logger)
+            return False
 
         # Formato de Comando Sugerido para WS2812B: LED:<ID>:<RRGGBB>
         try:
             led_index = int(button_key) - 1 
-            hex_payload = color_hex.lstrip('#') 
+            hex_payload = color_hex.lstrip('#').upper()  # Garante formato consistente
             
-            command = f"LED:{led_index}:{hex_payload}" # Sem o '\n' para ser adicionado pelo send_command
+            # Validação básica da cor HEX
+            if len(hex_payload) != 6:
+                hex_payload = "FFFFFF"  # Fallback para branco
+                
+            command = f"LED:{led_index}:{hex_payload}"
             
+            success = False
             if is_serial:
-                self.serial_manager.send_command(command)
-                self.logger.info(f"⚡ Enviado serial: {command}")
+                success = self.serial_manager.send_command(command)
+                if not silent:
+                    self.logger.info(f"⚡ Enviado serial: {command}")
             elif is_wifi:
-                self.wifi_manager.send_command(command)
-                self.logger.info(f"⚡ Enviado Wi-Fi: {command}")
+                success = self.wifi_manager.send_command(command)
+                if not silent:
+                    self.logger.info(f"⚡ Enviado Wi-Fi: {command}")
+            
+            return success
             
         except Exception as e:
-            self.logger.error(f"Erro ao formatar/enviar comando LED: {e}")
+            if not silent:
+                self.logger.error(f"Erro ao formatar/enviar comando LED: {e}")
+            return False
 
     def _send_all_led_command(self, command: str):
         """Envia um comando para todos os LEDs (Ex: ON, OFF, RAINBOW)"""
