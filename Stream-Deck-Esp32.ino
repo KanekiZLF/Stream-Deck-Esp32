@@ -2156,41 +2156,34 @@ void updateBatteryLogic()
 
 void updateBatteryDisplay()
 {
-    int battX = SCREEN_WIDTH - 45;
-    int battY = 4;
-
-    // Limpa area da bateria antes de desenhar
-    tft.fillRect(battX - 30, battY, 50, 15, SECONDARY_COLOR);
-
-    // Icone da bateria
-    tft.drawRect(battX, battY, 30, 12, TEXT_COLOR);
-    tft.fillRect(battX + 30, battY + 3, 2, 6, TEXT_COLOR);
-
-    // Barra de carga
-    int fillWidth = map(batteryPercentage, 0, 100, 0, 28);
-
+    int batteryX = SCREEN_WIDTH - 45;
+    int batteryY = 6;
+    
+    // Limpa área
+    tft.fillRect(batteryX - 2, batteryY - 2, 44, 14, SECONDARY_COLOR);
+    
+    // Contorno da bateria
+    tft.drawRect(batteryX, batteryY, 30, 10, TFT_WHITE);
+    tft.fillRect(batteryX + 30, batteryY + 2, 3, 6, TFT_WHITE);
+    
+    // Nível (simulado - ajuste com sua lógica real)
+    int battLevel = 75; // Exemplo: 75%
+    int fillWidth = map(battLevel, 0, 100, 0, 28);
+    
+    // Gradiente de cor
     uint16_t fillColor;
-    if (batteryPercentage > 60)
-        fillColor = SUCCESS_COLOR;
-    else if (batteryPercentage > 20)
-        fillColor = WARNING_COLOR;
-    else
-        fillColor = ERROR_COLOR;
-
-    tft.fillRect(battX + 1, battY + 1, fillWidth, 10, fillColor);
-
-    // Porcentagem - sempre atualiza, evita sobreposição
-    tft.setTextColor(TEXT_COLOR);
+    if (battLevel > 70) fillColor = TFT_GREEN;
+    else if (battLevel > 30) fillColor = TFT_YELLOW;
+    else fillColor = TFT_RED;
+    
+    // Preenche bateria
+    tft.fillRect(batteryX + 1, batteryY + 1, fillWidth, 8, fillColor);
+    
+    // Porcentagem pequena
+    tft.setTextColor(TFT_WHITE);
     tft.setTextSize(1);
-    tft.setTextDatum(TR_DATUM);
-
-    // Limpa area do texto antes de escrever
-    tft.fillRect(battX - 30, battY, 25, 10, SECONDARY_COLOR);
-
-    // Desenha porcentagem
-    tft.drawString(String(batteryPercentage) + "%", battX - 3, battY + 3);
-
-    lastBatteryPercentage = batteryPercentage;
+    tft.setCursor(batteryX - 15, batteryY + 2);
+    tft.printf("%d%%", battLevel);
 }
 
 // =========================================================================
@@ -2414,13 +2407,18 @@ void checkSerialCommands()
             }
         }
         else if (message == "DISCONNECT")
-        {
+        {   
+            // Carrega e APLICA o efeito salvo
+            loadEffectFromPrefs();
+            applySavedEffect();
+
             if (activeProtocol == USB)
             {
                 activeProtocol = client.connected() ? WIFI : NONE;
                 showConnectionFeedback(activeProtocol); // Mostra feedback apropriado
                 if (currentState == STATE_MAIN)
                     drawMainScreen();
+                
                 Serial.println("Desconectado do USB");
             }
         }
@@ -2645,7 +2643,7 @@ void checkSerialCommands()
             Serial.println("❓ AJUDA:");
             Serial.println("   HELP ou ?         // Esta mensagem");
             Serial.println("═══════════════════════════════════════");
-        } // Na função checkSerialCommands(), adicione:
+        }
         else
         {
             Serial.println("❌ Comando não reconhecido: " + message);
@@ -2790,14 +2788,53 @@ void showConnectionFeedback(ConnectionProtocol newProtocol)
 
 void restoreSavedEffect()
 {
-
     isInFeedbackMode = false;
     shouldRestoreEffect = false;
-    effectActive = false;
-    manualControl = false;
-    clearAllLEDs();
+    
+    // Aplica o efeito salvo ao terminar o feedback
+    if (savedEffect != "NONE" && savedEffect != "")
+    {
+        applySavedEffect();
+        Serial.println("🔄 Efeito restaurado após feedback");
+    }
+    else
+    {
+        currentEffect = "RAINBOW";
+        saveEffectToPrefs("RAINBOW");
+        Serial.println("🔄 Nenhum efeito salvo, aplicando padrão");
+    }
+}
 
-    Serial.println("🔄 Estado resetado após feedback");
+// =========================================================================
+// === APLICAR EFEITO SALVO ================================================
+// =========================================================================
+
+void applySavedEffect()
+{
+    for (int i = 0; i < NUM_LEDS; i++)
+    {
+        ledMask[i] = false;  // Limpa máscara
+    }
+    
+    if (savedEffect != "NONE" && savedEffect != "")
+    {
+        effectActive = true;
+        currentEffect = savedEffect;
+        manualControl = true;
+        effectTimer = millis();
+        
+        // Aplica imediatamente
+        updateEffect();
+        FastLED.show();
+        
+        Serial.println("✅ Efeito aplicado: " + savedEffect);
+    }
+    else
+    {
+        currentEffect = "RAINBOW";
+        saveEffectToPrefs("RAINBOW");
+        Serial.println("✅ Nenhum Efeito encontrado, aplicando efeito: " + savedEffect);
+    }
 }
 
 // =========================================================================
@@ -3384,6 +3421,8 @@ void loop()
                                 activeProtocol = NONE;
                                 drawMainScreen();
                             }
+                            loadEffectFromPrefs();
+                            applySavedEffect();
                             Serial.println("Cliente Wi-Fi desconectado por comando");
                         }
                     }
