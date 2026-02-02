@@ -355,7 +355,7 @@ void drawLoadingScreen()
         }
         FastLED.show();
 
-        delay(300);
+        delay(100);
     }
 
     // Barra de progresso
@@ -376,8 +376,6 @@ void drawLoadingScreen()
 
     manualControl = false;
     clearAllLEDs();
-
-    delay(500);
 }
 
 void drawMainScreen()
@@ -864,7 +862,7 @@ void drawBatteryInfoScreen()
     else
     {
         tft.setTextColor(SUCCESS_COLOR);
-        tft.drawString("SISTEMA OPERANDO VIA LI-PO", SCREEN_WIDTH / 2, boxY + 11);
+        tft.drawString("SISTEMA OPERANDO VIA Li-Ion", SCREEN_WIDTH / 2, boxY + 11);
     }
 
     // 6. RODAPÉ DE NAVEGAÇÃO
@@ -2136,19 +2134,27 @@ void updateBatteryLogic()
     }
     rawADC /= 10;
 
+    // Cálculo da tensão
     batteryVoltage = (rawADC / 4095.0) * 3.3 * 2.0;
 
-    if (batteryVoltage >= 4.2)
-    {
+    // **CÁLCULO MELHORADO PARA BATERIA LI-ION**
+    // Valores típicos para bateria Li-Ion de celular:
+    // 4.2V = 100% (carregada)
+    // 3.7V = 20%  (nível típico de operação)
+    // 3.3V = 0%   (descarregada)
+    
+    if (batteryVoltage >= 4.2) {
         batteryPercentage = 100;
-    }
-    else if (batteryVoltage <= 3.0)
-    {
+    } else if (batteryVoltage >= 4.0) {
+        batteryPercentage = map(batteryVoltage * 100, 400, 420, 80, 100);
+    } else if (batteryVoltage >= 3.8) {
+        batteryPercentage = map(batteryVoltage * 100, 380, 400, 50, 80);
+    } else if (batteryVoltage >= 3.6) {
+        batteryPercentage = map(batteryVoltage * 100, 360, 380, 20, 50);
+    } else if (batteryVoltage >= 3.3) {
+        batteryPercentage = map(batteryVoltage * 100, 330, 360, 0, 20);
+    } else {
         batteryPercentage = 0;
-    }
-    else
-    {
-        batteryPercentage = map(batteryVoltage * 100, 300, 420, 0, 100);
     }
 
     batteryPercentage = constrain(batteryPercentage, 0, 100);
@@ -2156,34 +2162,61 @@ void updateBatteryLogic()
 
 void updateBatteryDisplay()
 {
-    int batteryX = SCREEN_WIDTH - 45;
-    int batteryY = 6;
+    // BATERIA HORIZONTAL (deitada)
+    int batteryWidth = 25;   // Largura do corpo
+    int batteryHeight = 10;  // Altura do corpo
+    int batteryX = SCREEN_WIDTH - 35;  // Canto direito
+    int batteryY = 6;                  // Altura original
     
-    // Limpa área
-    tft.fillRect(batteryX - 2, batteryY - 2, 44, 14, SECONDARY_COLOR);
+    // 1. LIMPEZA DA ÁREA
+    tft.fillRect(batteryX - 30, batteryY - 2, 55, 14, SECONDARY_COLOR);
     
-    // Contorno da bateria
-    tft.drawRect(batteryX, batteryY, 30, 10, TFT_WHITE);
-    tft.fillRect(batteryX + 30, batteryY + 2, 3, 6, TFT_WHITE);
+    // 2. DESENHA A BATERIA HORIZONTAL (DEITADA)
+    tft.drawRect(batteryX, batteryY, batteryWidth, batteryHeight, TFT_WHITE);
     
-    // Nível (simulado - ajuste com sua lógica real)
-    int battLevel = 75; // Exemplo: 75%
-    int fillWidth = map(battLevel, 0, 100, 0, 28);
+    // Polo positivo (pequeno quadrado na lateral direita - agora em cima)
+    int poleSize = 4;
+    int poleX = batteryX + batteryWidth;
+    int poleY = batteryY + (batteryHeight / 2) - (poleSize / 2);
+    tft.fillRect(poleX, poleY, 2, poleSize, TFT_WHITE);
     
-    // Gradiente de cor
+    // 3. PREENCHIMENTO HORIZONTAL (da esquerda para direita)
+    int fillWidth = map(batteryPercentage, 0, 100, 0, batteryWidth - 2);
+    
     uint16_t fillColor;
-    if (battLevel > 70) fillColor = TFT_GREEN;
-    else if (battLevel > 30) fillColor = TFT_YELLOW;
+    if (batteryPercentage > 70) fillColor = TFT_GREEN;
+    else if (batteryPercentage > 30) fillColor = TFT_YELLOW;
     else fillColor = TFT_RED;
     
-    // Preenche bateria
-    tft.fillRect(batteryX + 1, batteryY + 1, fillWidth, 8, fillColor);
+    if (fillWidth > 0) {
+        tft.fillRect(batteryX + 1, batteryY + 1, fillWidth, batteryHeight - 2, fillColor);
+    }
     
-    // Porcentagem pequena
+    // 4. TEXTO DA PORCENTAGEM (ao lado esquerdo)
     tft.setTextColor(TFT_WHITE);
     tft.setTextSize(1);
-    tft.setCursor(batteryX - 15, batteryY + 2);
-    tft.printf("%d%%", battLevel);
+    tft.setTextDatum(TL_DATUM);
+    
+    int textX = batteryX - 25;  // 25px antes da bateria
+    int textY = batteryY + 2;   // Alinhado com a bateria
+    
+    // Limpa área do texto
+    tft.fillRect(textX - 2, textY - 2, 25, 10, SECONDARY_COLOR);
+    
+    tft.setCursor(textX, textY);
+    
+    // Formatação
+    if (batteryPercentage == 100) {
+        tft.print("100%");
+    } else if (batteryPercentage >= 10) {
+        tft.print(" ");
+        tft.print(batteryPercentage);
+        tft.print("%");
+    } else {
+        tft.print("  ");
+        tft.print(batteryPercentage);
+        tft.print("%");
+    }
 }
 
 // =========================================================================
@@ -2422,7 +2455,7 @@ void checkSerialCommands()
                 Serial.println("Desconectado do USB");
             }
         }
-        else if (message == "STATUS")
+        else if (message == "STATUS" or message == "status")
         {
             Serial.println("\n═══════════════════════════════════════");
             Serial.println("       ESP32 DECK - STATUS DO SISTEMA");
@@ -2458,7 +2491,7 @@ void checkSerialCommands()
             Serial.println("   • Feedback ativo: " + String(isInFeedbackMode ? "Sim" : "Não"));
             Serial.println("═══════════════════════════════════════");
         }
-        else if (message == "LED_HELP")
+        else if (message == "LED_HELP" or message == "Led_Help" or message == "led_help")
         {
             Serial.println("\n═══════════════════════════════════════");
             Serial.println("         COMANDOS LED DISPONÍVEIS");
@@ -2610,7 +2643,7 @@ void checkSerialCommands()
             Serial.println("   • LEDs: 16 RGB WS2812B");
             Serial.println("   • Display: 1.14\" IPS (240x135)");
             Serial.println("   • Encoder: EC11 (rotação + botão)");
-            Serial.println("   • Bateria: Li-Po com TP4056");
+            Serial.println("   • Bateria: Li-Ion com TP4056");
             Serial.println("");
             Serial.println("🌐 CONECTIVIDADE:");
             Serial.println("   • Wi-Fi: 802.11 b/g/n");
