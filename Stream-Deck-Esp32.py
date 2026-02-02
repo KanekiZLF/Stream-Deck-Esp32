@@ -2705,11 +2705,11 @@ class Esp32DeckApp(ctk.CTk):
         ).grid(row=row_idx, column=0, sticky='ew', padx=10, pady=5)
         row_idx += 1
         
-        # Botão Efeito Piscante
+        # Botão Efeito Estrelas
         ctk.CTkButton(
             global_frame, 
-            text="Efeito Piscante ✨", 
-            command=lambda: self._send_all_led_command("BLINK"),
+            text="Efeito Estrelas ✨", 
+            command=lambda: self._send_all_led_command("TWINKLE"),
             fg_color=self.colors["primary"] 
         ).grid(row=row_idx, column=0, sticky='ew', padx=10, pady=(5, 10)) # pady final maior
         row_idx += 1
@@ -2717,7 +2717,7 @@ class Esp32DeckApp(ctk.CTk):
         self._update_quick_led_preview()
 
         # --- 3. Sincronização de Cores ---
-        sync_frame = ctk.CTkFrame(parent, corner_radius=8, border_width=1, border_color=self.colors["secondary"])
+        """sync_frame = ctk.CTkFrame(parent, corner_radius=8, border_width=1, border_color=self.colors["secondary"])
         sync_frame.pack(fill='x', padx=10, pady=(5, 15))
 
         ctk.CTkLabel(
@@ -2731,7 +2731,7 @@ class Esp32DeckApp(ctk.CTk):
             text="🔄 Sincronizar LEDs",
             command=self.force_sync_leds,
             fg_color=self.colors["primary"]
-        ).grid(row=1, column=0, sticky='ew', padx=10, pady=(5, 10))
+        ).grid(row=1, column=0, sticky='ew', padx=10, pady=(5, 10))"""
 
     def _update_quick_led_preview(self, *args):
         """Atualiza a pré-visualização de cor rápida baseada na cor salva do botão selecionado."""
