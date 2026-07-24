@@ -1,40 +1,43 @@
-# Ignorar a pasta de configurações do Visual Studio Code
-.vscode/
-
-# Outras pastas e arquivos comuns a serem ignorados
-config.json
-Esp32_deck.log*
-Esp32_deck.log
-Esp32_deck_config.json
-utils/
-token.txt
-icons/
-
-# Arquivos de dependências de projetos (Node.js, Python, etc.)
-node_modules/
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.pyc
+.pytest_cache/
+.pyre/
+.python-version
 venv/
-env/
-.env
-
-# Arquivos de build e logs
-dist/
-build/
 output/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+icons/
+Esp32_deck_config.json
+Esp32_deck.log
+env/
+ENV/
+.venv/
+*.env
 
-# Arquivos de sistema operacional
+# Editor directories and files
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# PlatformIO / ESP32 build artifacts
+.pio/
+.pioenvs/
+build/
+*.bin
+*.elf
+*.hex
+*.map
+*.o
+
+# Misc
 .DS_Store
 Thumbs.db
-
-# Arquivos de IDEs e editores
-.idea/
-*.swp
-output/Esp32_deck.log
-Esp32_deck.log
-output/Esp32_deck.log
-Esp32_deck.log
 Esp32_deck_config.json
-utils/version_info.txt
+Esp32_deck.log
+output/Esp32_deck_config.json
+output/Esp32_deck.log
